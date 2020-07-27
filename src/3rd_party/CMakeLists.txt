@@ -6,7 +6,10 @@ add_subdirectory(./SQLiteCpp)
 add_subdirectory(./pathie-cpp)
 add_subdirectory(./zlib)
 add_subdirectory(./faiss)
+add_subdirectory(./warp-ctc)
 include_directories(./faiss)
+include_directories(./warp-ctc/include)
+
 
 if(USE_FBGEMM)
   # @TODO: find out if this is somehow harmful. This is supppressing CMake warnings for CMAKE_SUPPRESS_DEVELOPER_WARNINGS

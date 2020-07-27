@@ -4,6 +4,7 @@ include_directories(.)
 include_directories(3rd_party)
 include_directories(3rd_party/SQLiteCpp/include)
 include_directories(3rd_party/sentencepiece)
+include_directories(3rd_party/warp-ctc/include)
 include_directories(3rd_party/fbgemm/include)
 include_directories(${CMAKE_BINARY_DIR}/local/include)
 
