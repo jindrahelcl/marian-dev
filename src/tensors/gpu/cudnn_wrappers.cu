@@ -319,6 +319,38 @@ PoolingWrapper::~PoolingWrapper() {
   CUDNN_CALL(cudnnDestroyPoolingDescriptor(poolingDesc_));
 }
 
+
+
+/******************************************************************************
+ CTCWrapper
+*****************************************************************************/
+
+CTCWrapper::CTCWrapper() {
+  ctcAlgo_ = CUDNN_CTC_LOSS CUDNN_CTC_LOSS_ALGO_DETERMINISTIC;
+  setCTCLossDescriptor();
+}
+
+void CTCWrapper::setCTCLossDescriptor() {
+  CUDNN_CALL(cudnnCreateCTCLossDescriptor(&ctcDesc_));
+  CUDNN_CALL(cudnnSetCTCLossDescriptor(ctcDesc_, CUDNN_DATA_FLOAT));
+}
+
+
+void CTCWrapper::forward(Tensor x) {
+  cudaSetDevice(x->getDeviceId().no);
+
+  cudnnTensorDescriptor_t xDesc
+  
+}
+  
+CTCWrapper::~CTCWrapper() {
+  CUDNN_CALL(cudnnDestroyCTCLossDescriptor(ctcDesc_));
+}
+
+
+
+
+  
 #else
 
 CUDNNWrapper::CUDNNWrapper() {
