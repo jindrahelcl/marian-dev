@@ -92,13 +92,9 @@ protected:
  
 class CTCWrapper : public CUDNNWrapper {
 public:
-  CTCWrapper(int args);
+  CTCWrapper());
 
-  void getOutputShape(const Shape& xShape, Shape& shape);
-
-  void forward(Tensor x, Tensor y);
-
-  void backward(Tensor x, Tensor xGrad, Tensor y, Tensor yGrad);
+  void compute(Tensor logits, Tensor labels, Tensor grads);
 
   virtual ~CTCWrapper();
 
@@ -106,7 +102,6 @@ protected:
   void setCTCLossDescriptor();
   
   cudnnCTCLossDescriptor_t ctcDesc_;
-  cudnnCTCAlgo_t ctcAlgo_;
 };
 
 
