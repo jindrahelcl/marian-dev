@@ -1282,5 +1282,44 @@ public:
 protected:
   ConvolutionWrapper conv_;
 };
+
+// ====================== CTC
+// TODO struct or class? why?
+class CTCNodeOp : public NaryNodeOp {
+  CTCNodeOp(Expr a, Expr indices)
+    : NaryNodeOp({a, indices}, newShape(a), a->value_type()) {
+    matchOrAbort<IndexType>(indices->value_type());
+    int rows   = a->shape().elements() / a->shape()[-1];
+    int labels = indices->shape().elements();
+    ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
+  }
+
+  Shape newShape(Expr a) {
+    Shape shape1 = a->shape();
+    shape1.set(a->shape().size() - 1, 1);
+    return shape1;
+  }
+
+  NodeOps forwardOps() override {
+    // TODO supply correct arguments, grads as output param
+    // TODO figure out where to get input & label lengths
+    return {NodeOp(ctc_.compute(  child(0)->val(), child(1)->val(), grads_->val();  ))};
+  }
+
+  NodeOps backwardOps() override {
+    // TODO add gradients computed in forward pass.
+    // TODO Dont know whether to use adj_ or not.
+    return {NodeOp(Add(_1, child(0)->grad(), grads_))};
+  }
+
+  const std::string type() override { return "ctc"; }
+
+private:
+  Expr grads_;
+  CTCWrapper ctc_;
+
+};
+
+
 #endif
 }  // namespace marian
