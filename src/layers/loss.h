@@ -268,6 +268,26 @@ public:
  */
 Ptr<MultiRationalLoss> newMultiLoss(Ptr<Options> options);
 
+class CTCLoss : public LabelWiseLoss{
+public:
+  CTCLoss() : CTCLoss(/*axes=*/{-2, -3}) {}
+  CTCLoss(const std::vector<int>& axes) : LabelWiseLoss(axes) {}
+
+  virtual ~CTCLoss() {}
+
+protected:
+  virtual Expr compute(Logits logits, const Words& labels,
+                       Expr mask = nullptr, Expr labelWeights = nullptr) override {
+    // TODO in this function, the CTC loss will be computed
+
+    auto ctcl = logits.applyLossFunction(labels, [&](Expr logits, Expr indices) {
+      logits = atleast_3d(logits);
+      Expr ctcl = cast(ctc_loss(logits, indices), Type::float32);
+      return ctcl;
+    });
+  }
+}
+
 //***********************************************************************************//
 // This needs to be refactored. Currently easiest route for backwards compat, but
 // still feels somewhat hacky.
