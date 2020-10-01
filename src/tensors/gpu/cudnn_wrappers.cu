@@ -6,6 +6,17 @@ namespace marian {
 
 #include <cudnn.h>
 
+#define CUDA_CALL(x)                  \
+  do {                                \
+    if((x) != cudaSuccess) {          \
+      printf("Error (%s) at %s:%d\n", \
+             cudaGetErrorString(x),   \
+             __FILE__,                \
+             __LINE__);               \
+    }                                 \
+  } while(0)
+
+
 #define CUDNN_CALL(x)                 \
   do {                                \
     if((x) != CUDNN_STATUS_SUCCESS) { \
@@ -326,7 +337,6 @@ PoolingWrapper::~PoolingWrapper() {
 *****************************************************************************/
 
 CTCWrapper::CTCWrapper() {
-  ctcAlgo_ = CUDNN_CTC_LOSS CUDNN_CTC_LOSS_ALGO_DETERMINISTIC;
   setCTCLossDescriptor();
 }
 
@@ -336,21 +346,97 @@ void CTCWrapper::setCTCLossDescriptor() {
 }
 
 
-void CTCWrapper::forward(Tensor x) {
-  cudaSetDevice(x->getDeviceId().no);
+void CTCWrapper::compute(Tensor logits, Tensor labels, Tensor grads) {
+  cudaSetDevice(grads->getDeviceId().no);
 
-  cudnnTensorDescriptor_t xDesc
+  Shape logitsShape = logits->shape();
+
+  int time = logitsShape[0];
+  int batch = logitsShape[1];
+  int vocab = logitsShape[2];
+
+  const int dims[] = {time, batch, vocab};
+  const int strides[] = {batch * vocab, vocab, 1};
   
-}
+  cudnnTensorDescriptor_t logitsDesc;
+  CUDNN_CALL(cudnnCreateTensorDescriptor(&logitsDesc));
+  CUDNN_CALL(cudnnSetTensorNdDescriptor(logitsDesc,
+                                        CUDNN_DATA_FLOAT,
+                                        3,
+                                        dims,
+                                        strides));
   
+  cudnnTensorDescriptor_t gradsDesc;
+  CUDNN_CALL(cudnnCreateTensorDescriptor(&gradsDesc));
+  CUDNN_CALL(cudnnSetTensorNdDescriptor(gradsDesc,
+                                        CUDNN_DATA_FLOAT,
+                                        3,
+                                        dims,
+                                        strides));
+  
+  // here, supply flat labels in CPU memory for CuDNN 7, or flat labels in GPU memory
+  // for CuDNN 8.
+
+  // label lengths
+   
+  size_t gpuWorkspaceSize;
+  CUDNN_CALL(cudnnGetCTCWorkspaceSize(cudnnHandle_,
+                                      logitsDesc,
+                                      gradsDesc,
+                                      labels.data(),
+                                      // TODO get label lengths!, put them here
+                                      // TODO get input lengths!, put them here
+                                      CUDNN_CTC_LOSS_ALGO_DETERMINISTIC,
+                                      ctcDesc_,
+                                      &gpuWorkspaceSize));
+
+  void* gpuWorkspace;
+  CUDA_CALL(cudaMalloc(&gpuWorkspace, gpuWorkspaceSize));
+
+  float *gpuLosses;
+  CUDA_CALL(cudaMalloc(&gpuLosses, sizeof(float) * batch));
+  // TODO losses should be output argument, no malloc here.
+
+  cudnnStatus_t status = cudnnCTCLoss(cudnnHandle_,
+                                      logitsDesc,
+                                      logits->data(),
+                                      labels->data(),
+                                      // TODO get label lengths!, put them here
+                                      // TODO get input lengths!, put them here
+                                      gpuLosses,
+                                      gradsDesc,
+                                      grads->data(),
+                                      CUDNN_CTC_LOSS_ALGO_DETERMINISTIC,
+                                      ctcDesc_,
+                                      gpuWorkspace,
+                                      gpuWorkspaceSize);
+
+  switch(status) {
+    case CUDNN_STATUS_SUCCESS:
+      break;
+    case CUDNN_STAUS_BAD_PARAM:
+      if (time > 256) {  // TODO not time, but label lengths!
+          printf("Too many labels (%d). Limit is 256.", time);          
+      }
+      break;
+    case CUDNN_STATUS_NOT_SUPPORTED:
+    case CUDNN_STATUS_EXECUTION_FAILED:
+      printf("Error in CTC loss computation: %s", cudnnGetErrorString(status));
+      break;
+  }
+
+  cudaFree(gpuWorkspace);
+  //TODO no free for losses here.
+  
+  CUDNN_CALL(cudnnDestroyTensorDescriptor(logitsDesc));
+  CUDNN_CALL(cudnnDestroyTensorDescriptor(gradsDesc));  
+}  
+
 CTCWrapper::~CTCWrapper() {
   CUDNN_CALL(cudnnDestroyCTCLossDescriptor(ctcDesc_));
 }
 
 
-
-
-  
 #else
 
 CUDNNWrapper::CUDNNWrapper() {
