@@ -88,13 +88,16 @@ protected:
   cudnnPoolingDescriptor_t poolingDesc_;
   cudnnPoolingMode_t poolingMode_;
 };
-
  
 class CTCWrapper : public CUDNNWrapper {
 public:
-  CTCWrapper());
+  CTCWrapper();
 
-  void compute(Tensor logits, Tensor labels, Tensor grads);
+  void compute(Tensor loss,
+               Tensor grads,
+               Tensor logits,
+               Tensor flatLabels,
+               Tensor labelLengths);
 
   virtual ~CTCWrapper();
 
@@ -103,7 +106,6 @@ protected:
   
   cudnnCTCLossDescriptor_t ctcDesc_;
 };
-
 
 }  // namespace marian
 
@@ -161,15 +163,18 @@ public:
 
 class CTCWrapper : public CUDNNWrapper {
 public:
-  CTCWrapper(int args);
+  CTCWrapper();
 
-  void getOutputShape(const Shape& xShape, Shape& shape);
-
-  void forward(Tensor x, Tensor y);
-
-  void backward(Tensor x, Tensor xGrad, Tensor y, Tensor yGrad);
+  void compute(Tensor loss,
+               Tensor grads,
+               Tensor logits,
+               Tensor flatLabels,
+               Tensor labelLengths);
 
   virtual ~CTCWrapper();
+
+protected:
+  void setCTCLossDescriptor();
 };
 
 }  // namespace marian

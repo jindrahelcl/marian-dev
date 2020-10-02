@@ -884,7 +884,7 @@ Expr cross_entropy(Expr a, Expr b, float labelSmoothingAlpha = 0.f, Type outputT
  */
 Expr unlikelihood(Expr a, Expr b);
 
-Expr ctc_loss(Expr a, Expr b);
+Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths);
 
 /**
  * Computes the scalar product along the specified axis.

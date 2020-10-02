@@ -29,6 +29,21 @@ public:
   virtual ~ICost() {}
 };
 
+/* 
+class EncoderDecoderCTCCost : public ICost {
+protected:
+  Ptr<Options> options_;
+  const bool inference_{false};
+
+  Ptr<RationalLoss> loss_;
+
+public:
+  EncoderDecoderCTCCost(Ptr<Options> options)
+      : options_(options), inference_;
+
+}
+ */
+
 class EncoderDecoderCECost : public ICost {
 protected:
   Ptr<Options> options_;
