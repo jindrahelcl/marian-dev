@@ -266,7 +266,7 @@ Expr logsoftmax(Expr a);
 
 Expr cross_entropy(Expr a, Expr b);
 
-Expr ctc_loss(Expr a, Expr b);
+Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths);
 
 Expr unlikelihood(Expr a, Expr b);
 

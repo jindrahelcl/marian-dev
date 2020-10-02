@@ -1283,33 +1283,43 @@ protected:
   ConvolutionWrapper conv_;
 };
 
-// ====================== CTC
-// TODO struct or class? why?
 class CTCNodeOp : public NaryNodeOp {
-  CTCNodeOp(Expr a, Expr indices)
-    : NaryNodeOp({a, indices}, newShape(a), a->value_type()) {
-    matchOrAbort<IndexType>(indices->value_type());
-    int rows   = a->shape().elements() / a->shape()[-1];
-    int labels = indices->shape().elements();
+public:
+  CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths)
+    : NaryNodeOp({logits, flatLabels, labelLengths}, newShape(logits), logits->value_type()) {
+    matchOrAbort<IndexType>(flatLabels->value_type());
+
+    int rows   = logits->shape().elements() / logits->shape()[-1];
+    int labels = labelLengths->shape().elements();
+
     ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
+
+    // output shape of this op should be 1, batch, 1.
+    // input lengths correspond to the time dimension of logits
   }
 
   Shape newShape(Expr a) {
     Shape shape1 = a->shape();
-    shape1.set(a->shape().size() - 1, 1);
+    shape1.set(a->shape().size() - 1, 1);  // will reduce the logit dimension
+    shape1.set(a->shape().size() - 3, 1);  // will reduce the time dimension
     return shape1;
   }
 
   NodeOps forwardOps() override {
     // TODO supply correct arguments, grads as output param
     // TODO figure out where to get input & label lengths
-    return {NodeOp(ctc_.compute(  child(0)->val(), child(1)->val(), grads_->val();  ))};
+    return {NodeOp(ctc_.compute(val_,
+                                grads_->val(),
+                                child(0)->val(),
+                                child(1)->val(),
+                                child(2)->val()))};
   }
 
   NodeOps backwardOps() override {
+    using namespace functional;
     // TODO add gradients computed in forward pass.
     // TODO Dont know whether to use adj_ or not.
-    return {NodeOp(Add(_1, child(0)->grad(), grads_))};
+    return {NodeOp(Element(_1 = _2, child(0)->grad(), grads_->val()))};
   }
 
   const std::string type() override { return "ctc"; }
@@ -1317,9 +1327,7 @@ class CTCNodeOp : public NaryNodeOp {
 private:
   Expr grads_;
   CTCWrapper ctc_;
-
 };
-
 
 #endif
 }  // namespace marian
