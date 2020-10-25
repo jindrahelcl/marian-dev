@@ -4,6 +4,7 @@
 #include "models/encoder_decoder.h"
 #include "models/encoder_classifier.h"
 #include "models/bert.h"
+#include "models/sequence_labeler.h"
 
 #include "models/costs.h"
 
@@ -30,7 +31,7 @@ namespace models {
 Ptr<EncoderBase> EncoderFactory::construct(Ptr<ExpressionGraph> graph) {
   if(options_->get<std::string>("type") == "s2s")
     return New<EncoderS2S>(graph, options_);
-  
+
   if(options_->get<std::string>("type") == "laser" || options_->get<std::string>("type") == "laser-sim")
     return New<EncoderLaser>(graph, options_);
 
@@ -61,6 +62,8 @@ Ptr<ClassifierBase> ClassifierFactory::construct(Ptr<ExpressionGraph> graph) {
     return New<BertMaskedLM>(graph, options_);
   else if(options_->get<std::string>("type") == "bert-classifier")
     return New<BertClassifier>(graph, options_);
+  else if(options_->get<std::string>("type") == "sequence-labeler")
+    return New<SequenceLabeler>(graph, options_);
   else
     ABORT("Unknown classifier type");
 }
@@ -130,7 +133,7 @@ Ptr<IModel> createBaseModelByType(std::string type, usage use, Ptr<Options> opti
 
   if(use == usage::embedding) { // hijacking an EncoderDecoder model for embedding only
     int dimVocab = options->get<std::vector<int>>("dim-vocabs")[0];
-    
+
     Ptr<Options> newOptions;
     if(options->get<bool>("compute-similarity")) {
       newOptions = options->with("usage", use,
@@ -143,8 +146,8 @@ Ptr<IModel> createBaseModelByType(std::string type, usage use, Ptr<Options> opti
                                  "input-types", std::vector<std::string>({"sequence"}),
                                  "dim-vocabs", std::vector<int>(1, dimVocab));
     }
-    
-    auto res = New<EncoderPooler>(newOptions);      
+
+    auto res = New<EncoderPooler>(newOptions);
     if(options->get<bool>("compute-similarity")) {
       res->push_back(models::encoder(newOptions->with("index", 0)).construct(graph));
       res->push_back(models::encoder(newOptions->with("index", 1)).construct(graph));
@@ -323,6 +326,15 @@ Ptr<IModel> createBaseModelByType(std::string type, usage use, Ptr<Options> opti
                    ("type", "bert-classifier")   //
                    ("index", 1))                 // next sentence prediction
         .construct(graph);
+  }
+
+  else if(type == "transformer-nat") {
+    return models::encoder_classifier()(options)
+      ("original-type", "transformer-nat")
+      ("usage", use)
+      .push_back(models::encoder()("type", "transformer"))
+      .push_back(models::classifier()("type", "sequence-labeler"))
+      .construct(graph);
   }
 
 #ifdef COMPILE_EXAMPLES
