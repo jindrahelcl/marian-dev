@@ -9,7 +9,7 @@ namespace marian {
 
 /**
  * Simple base class for Classifiers to be used in EncoderClassifier framework
- * Currently only implementations are in bert.h
+ * Currently only implementations are in bert.h and sequence_labeler.h
  */
 class ClassifierBase :public LayerBase {
   using LayerBase::LayerBase;
