@@ -17,22 +17,22 @@ class LambdaNodeOp : public NaryNodeOp {
 private:
   typedef const std::vector<Expr>& Inputs;
   typedef std::function<void(Expr, Inputs)> LambdaNodeFunctor;
-  
+
   std::unique_ptr<LambdaNodeFunctor> forward_;
   std::unique_ptr<LambdaNodeFunctor> backward_;
-  
+
 public:
-  LambdaNodeOp(Inputs inputs, Shape shape, Type type, 
-               LambdaNodeFunctor forward) 
-  : NaryNodeOp(inputs, shape, type), 
+  LambdaNodeOp(Inputs inputs, Shape shape, Type type,
+               LambdaNodeFunctor forward)
+  : NaryNodeOp(inputs, shape, type),
     forward_(new LambdaNodeFunctor(forward)) {
     Node::trainable_ = !!backward_;
   }
 
-  LambdaNodeOp(Inputs inputs, Shape shape, Type type, 
+  LambdaNodeOp(Inputs inputs, Shape shape, Type type,
                LambdaNodeFunctor forward,
-               LambdaNodeFunctor backward) 
-  : NaryNodeOp(inputs, shape, type), 
+               LambdaNodeFunctor backward)
+  : NaryNodeOp(inputs, shape, type),
     forward_(new LambdaNodeFunctor(forward)),
     backward_(new LambdaNodeFunctor(backward)) {
   }
@@ -1377,7 +1377,7 @@ public:
     using namespace functional;
     // TODO add gradients computed in forward pass.
     // TODO Dont know whether to use adj_ or not.
-    return {NodeOp(Element(_1 = _2, child(0)->grad(), grads_->val()))};
+    return {NodeOp(Element(_1 = _2 + _3, child(0)->grad(), grads_->val(), adj_))};
   }
 
   const std::string type() override { return "ctc"; }
