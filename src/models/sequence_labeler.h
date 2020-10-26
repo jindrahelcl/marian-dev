@@ -10,6 +10,8 @@ class SequenceLabeler : public ClassifierBase {
   using ClassifierBase::ClassifierBase;
 
 public:
+  SequenceLabeler(Ptr<ExpressionGraph> graph, Ptr<Options> options)
+      : ClassifierBase(graph, options) {};
 
   // // TODO this function is copied from transformer.h
   // void lazyCreateOutputLayer() {
@@ -42,7 +44,7 @@ public:
     // shape is [beam depth=1, max length, batch size, vector dim]
 
     //int dimModel = context->shape()[-1];
-    int dimTrgCls = opt<std::vector<int>>("dim-vocabs")[batchIndex_];
+    int dimTrgCls = options_->get<std::vector<int>>("dim-vocabs")[batchIndex_];
 
     // TODO perhaps add hidden layer?
     auto output = mlp::mlp()
