@@ -254,39 +254,66 @@ void Corpus::shuffleData(const std::vector<std::string>& paths) {
 
 CorpusBase::batch_ptr Corpus::toBatch(const std::vector<Sample>& batchVector) {
   size_t batchSize = batchVector.size();
+  ABORT_IF(batchSize == 0, "Empty batch");
 
   std::vector<size_t> sentenceIds;
 
-  std::vector<int> maxDims;      // @TODO: What's this? widths? maxLengths?
-  for(auto& ex : batchVector) {  // @TODO: rename 'ex' to 'sample' or 'sentenceTuple'
-    if(maxDims.size() < ex.size())
-      maxDims.resize(ex.size(), 0);
-    for(size_t i = 0; i < ex.size(); ++i) {
-      if(ex[i].size() > (size_t)maxDims[i])
-        maxDims[i] = (int)ex[i].size();
+  // maxLengths is per subBatch, stores length of longest sentence in subBatch
+  size_t n_subBatches = batchVector.front().size();
+  std::vector<size_t> maxLengths(n_subBatches, 0);  // initialize to zeros
+
+  for(auto& sample : batchVector) {
+    ABORT_IF(sample.size() != n_subBatches, "Found batch samples with different number of subBatches.");
+
+    for(size_t i = 0; i < n_subBatches; ++i) {
+      if(sample[i].size() > maxLengths[i])
+        maxLengths[i] = sample[i].size();
     }
-    sentenceIds.push_back(ex.getId());
+
+    sentenceIds.push_back(sample.getId());
   }
 
+  // compute total number of words per each subBatch
+  // compute lengths of sentences, subBatch-major
+  std::vector<size_t> words(n_subBatches, 0);
+  std::vector<std::vector<size_t>> sentenceLengths(n_subBatches, std::vector<size_t>(batchSize));
+
+  for(size_t b = 0; b < batchSize; ++b) {
+    for (size_t j = 0; j < n_subBatches; ++j) {
+      words[j] += batchVector[b][j].size();
+    }
+  }
+
+  // create subBatches
   std::vector<Ptr<SubBatch>> subBatches;
-  for(size_t j = 0; j < maxDims.size(); ++j) {
-    subBatches.emplace_back(New<SubBatch>(batchSize, maxDims[j], vocabs_[j]));
+  for(size_t j = 0; j < n_subBatches; ++j) {
+    subBatches.emplace_back(New<SubBatch>(batchSize, maxLengths[j], vocabs_[j]));
   }
 
-  std::vector<size_t> words(maxDims.size(), 0);
+  for(size_t j = 0; j < n_subBatches; ++j)
+    subBatches[j]->setWords(words[j]);
+
   for(size_t b = 0; b < batchSize; ++b) {                    // loop over batch entries
-    for(size_t j = 0; j < maxDims.size(); ++j) {             // loop over streams
+    for(size_t j = 0; j < n_subBatches; ++j) {             // loop over streams
       auto subBatch = subBatches[j];
       for(size_t s = 0; s < batchVector[b][j].size(); ++s) { // loop over word positions
         subBatch->data()[subBatch->locate(/*batchIdx=*/b, /*wordPos=*/s)/*s * batchSize + b*/] = batchVector[b][j][s];
         subBatch->mask()[subBatch->locate(/*batchIdx=*/b, /*wordPos=*/s)/*s * batchSize + b*/] = 1.f;
-        words[j]++;
       }
     }
   }
 
-  for(size_t j = 0; j < maxDims.size(); ++j)
-    subBatches[j]->setWords(words[j]);
+  // set up sparse representation (flat only valid indices and sentence lengths)
+  for(size_t j = 0; j < n_subBatches; ++j) {  // loop over streams
+    size_t wordIndex = 0;
+    for(size_t b = 0; b < batchSize; ++b) {   // loop over batch entries
+      for(size_t s = 0; s < batchVector[b][j].size(); ++s) {
+        subBatches[j]->flatData()[wordIndex] = batchVector[b][j][s];
+        ++wordIndex;
+      }
+      subBatches[j]->sentenceLengths()[b] = batchVector[b][j].size();
+    }
+  }
 
   auto batch = batch_ptr(new batch_type(subBatches));
   batch->setSentenceIds(sentenceIds);

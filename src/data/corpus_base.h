@@ -110,6 +110,9 @@ private:
   Words indices_;
   std::vector<float> mask_;
 
+  Words validIndices_;
+  std::vector<size_t> lengths_;
+
   size_t size_;
   size_t width_;
   size_t words_;
@@ -127,6 +130,8 @@ public:
   SubBatch(size_t size, size_t width, const Ptr<const Vocab>& vocab)
     : indices_(size * width, vocab ? vocab->getEosId() : Word::ZERO), // note: for gaps, we must use a valid index
     mask_(size * width, 0),
+    validIndices_(),
+    lengths_(size, 0),
     size_(size),
     width_(width),
     words_(0),
@@ -141,6 +146,13 @@ public:
    */
   Words& data() { return indices_; }
   const Words& data() const { return indices_; }
+
+  Words& flatData() { return validIndices_; }
+  const Words& flatData() const { return validIndices_; }
+
+  std::vector<size_t>& sentenceLengths() {return lengths_; }
+  const std::vector<size_t>& sentenceLengths() const {return lengths_; }
+
   /**
    * @brief compute flat index into data() and mask() vectors for given batch index and word index in sentence
    */
@@ -195,35 +207,53 @@ public:
 
       // determine actual width (=max length) of this sub-batch, which may be smaller than the overall max length
       size_t subWidth = 0;
+      size_t words = 0;
       for(size_t s = 0; s < width_; ++s) {
         for(size_t b = 0; b < subSize; ++b) {
-          if(mask_[locate(/*batchIdx=*/pos + b, /*wordPos=*/s)] != 0)   // s * size_ + (pos + b)
+          if(mask_[locate(/*batchIdx=*/pos + b, /*wordPos=*/s)] != 0) {  // s * size_ + (pos + b)
             if (subWidth < s + 1)
               subWidth = s + 1;
+            words++;
+          }
         }
       }
 
       // create sub-batch
       auto sb = New<SubBatch>(subSize, subWidth, vocab_);
+      sb->setWords(words);
 
-      size_t words = 0;
+      size_t words2 = 0;
       for(size_t s = 0; s < subWidth; ++s) {
         for(size_t b = 0; b < subSize; ++b) {
           sb->data()[locate(/*batchIdx=*/b, /*wordPos=*/s, /*batchSize=*/subSize)/*s * subSize + b*/] = indices_[locate(/*batchIdx=*/pos + b, /*wordPos=*/s)]; // s * size_ + (pos + b)
           sb->mask()[locate(/*batchIdx=*/b, /*wordPos=*/s, /*batchSize=*/subSize)/*s * subSize + b*/] =    mask_[locate(/*batchIdx=*/pos + b, /*wordPos=*/s)]; // s * size_ + (pos + b)
 
           if(mask_[locate(/*batchIdx=*/pos + b, /*wordPos=*/s)/*s * size_ + (pos + b)*/] != 0)
-            words++;
+            words2++;
         }
       }
-      sb->setWords(words);
+
+      size_t wordIndex = 0;
+      for(size_t b = 0; b < subSize; ++b) {
+        sb->sentenceLengths()[b] = lengths_[pos + b];
+
+        for(size_t s = 0; s < lengths_[pos + b]; ++s) {
+          sb->flatData()[wordIndex] = indices_[locate(pos + b, s)];
+          ++wordIndex;
+        }
+      }
+
+      ABORT_IF(words != wordIndex, "Number of unmasked word indices not equal to number of flattened labels");
 
       splits.push_back(sb);
     }
     return splits;
   }
 
-  void setWords(size_t words) { words_ = words; }
+  void setWords(size_t words) {
+    words_ = words;
+    validIndices_.resize(words, vocab_ ? vocab_->getEosId() : Word::ZERO);
+  }
 
   // experimental: hide inline-fix source tokens from cross attention
   std::vector<float> crossMaskWithInlineFixSourceSuppressed() const;
