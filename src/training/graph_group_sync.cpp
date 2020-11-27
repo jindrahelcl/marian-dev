@@ -1,5 +1,7 @@
 #include "training/graph_group_sync.h"
 
+#include "tensors/gpu/cuda_helpers.h"
+
 namespace marian {
 
 SyncGraphGroup::SyncGraphGroup(Ptr<Options> config, Ptr<IMPIWrapper> mpi)
@@ -47,7 +49,11 @@ void SyncGraphGroup::initialize(const Ptr<data::Batch>& exampleBatch) {
   // Also allocate and clear the gradients
   comm_->foreach([&](size_t i, size_t /*begin*/, size_t /*end*/) {
     builders_[i]->build(graphs_[i], exampleBatch);
+
+    printf("last error before forward: %d\n", cudaGetLastError());
     graphs_[i]->forward();
+    printf("last error after forward: %d\n", cudaGetLastError());
+
     graphs_[i]->params()->allocateBackward();
     graphs_[i]->params()->set_zero_adjoint();
   });
@@ -72,7 +78,7 @@ void SyncGraphGroup::initializeAvg() {
     graphAvg->setDevice({0, DeviceType::cpu});
 
     // load model through builder to activate model specific loading functions.
-    // This is important if a model is overloading Model::load(...) and e.g. 
+    // This is important if a model is overloading Model::load(...) and e.g.
     // mapping matrix names as in Amun.h
     auto builder = models::createCriterionFunctionFromOptions(options_, models::usage::training);
     builder->load(graphAvg, name, false);
@@ -351,7 +357,7 @@ void SyncGraphGroup::update(std::vector<Ptr<data::Batch>> subBatches, size_t num
 
   // cost across all local devices (scheduler will aggregate cross-process)
   StaticLoss localLoss = std::accumulate(localDeviceLosses.begin(), localDeviceLosses.end(), StaticLoss());
-  
+
   // model update
   if (std::isfinite(localLoss.loss) || mpi_->numMPIProcesses() > 1) { // guard against NaN (except with MPI, as this simple way could hang it)
     comm_->scatterReduceAndResetGrads(); // reduce gradients across all devices and MPI nodes into shards
@@ -442,8 +448,8 @@ void SyncGraphGroup::save(bool final) /*override*/ {
     swapParamsAvg();
   }
 
-  // @TODO: put all this in one place, in new branch this is already localized in one place and class, this is a quick hack which will be 
-  // done better after the next merge. Not doing this in other graph_groups as this would only make the merge harder. 
+  // @TODO: put all this in one place, in new branch this is already localized in one place and class, this is a quick hack which will be
+  // done better after the next merge. Not doing this in other graph_groups as this would only make the merge harder.
   // Determine model suffix *.npz or *.bin, then use the same suffix for all following models saved.
   std::string name = options_->get<std::string>("model");
   std::string suffix = name.substr(name.size() - 4);

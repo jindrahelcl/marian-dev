@@ -1,6 +1,7 @@
 #include "graph/expression_graph.h"
 #include "tensors/tensor_operators.h"
 
+#include "tensors/gpu/cuda_helpers.h"
 #include <sstream>
 
 namespace marian {
@@ -15,7 +16,7 @@ void ExpressionGraph::setDevice(DeviceId deviceId, Ptr<Device> device) {
     auto params = New<Parameters>(defaultElementType_);
     params->init(backend_);
     paramsByElementType_[defaultElementType_] = params;
-    
+
     if(device)
       tensors_ = New<Tensors>(backend_, device);
     else
@@ -105,13 +106,19 @@ void ExpressionGraph::forward(std::list<Expr>& forwardTape, bool finalPass) {
   while(!forwardTape.empty()) {
     auto v = forwardTape.front();
 
+    printf("before allocate: %d\n", cudaGetLastError());
     v->allocate();
+    printf("after allocate: %d\n", cudaGetLastError());
+
     v->init();
+    printf("after init: %d\n", cudaGetLastError());
 
     for(auto& child : v->children())
       ABORT_IF(!child->val(), "De-allocated child {} {} of {} {}", child->getId(), child->type(), v->getId(), v->type());
 
+    printf("before forward: %d\n", cudaGetLastError());
     v->forward();
+    printf("after forward: %d\n", cudaGetLastError());
 
     if(v->trainable() && throwNaN_) {
       bool isNaN = false, isInf = false;

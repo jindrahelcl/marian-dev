@@ -1,4 +1,5 @@
 #include "tensors/gpu/cudnn_wrappers.h"
+#include "tensors/gpu/cuda_helpers.h"
 
 namespace marian {
 
@@ -29,6 +30,8 @@ namespace marian {
 
 CUDNNWrapper::CUDNNWrapper() {
   CUDNN_CALL(cudnnCreate(&cudnnHandle_));
+  printf("%d\n", CUDNN_VERSION);
+  printf("after creating cudnn handle\n");
 }
 
 CUDNNWrapper::~CUDNNWrapper() {
@@ -340,15 +343,20 @@ CTCWrapper::CTCWrapper() {
 
 void CTCWrapper::setCTCLossDescriptor() {
   CUDNN_CALL(cudnnCreateCTCLossDescriptor(&ctcDesc_));
-  CUDNN_CALL(cudnnSetCTCLossDescriptor(ctcDesc_, CUDNN_DATA_FLOAT));
+  CUDNN_CALL(cudnnSetCTCLossDescriptor_v8(ctcDesc_,
+                                          CUDNN_DATA_FLOAT,
+                                          CUDNN_LOSS_NORMALIZATION_SOFTMAX,
+                                          CUDNN_NOT_PROPAGATE_NAN,
+                                          256));
 }
 
 void CTCWrapper::compute(Tensor loss,
-                         Tensor grads,
+                         void* grads,
                          Tensor logits,
                          Tensor flatLabels,
-                         Tensor labelLengths) {
-  cudaSetDevice(loss->getDeviceId().no);
+                         Tensor labelLengths,
+                         const Ptr<ExpressionGraph> graph) {
+  CUDA_CHECK(cudaSetDevice(loss->getDeviceId().no));
 
   Shape logitsShape = logits->shape();
 
@@ -373,6 +381,7 @@ void CTCWrapper::compute(Tensor loss,
                                         dims,
                                         strides));
 
+
   cudnnTensorDescriptor_t gradsDesc;
   CUDNN_CALL(cudnnCreateTensorDescriptor(&gradsDesc));
   CUDNN_CALL(cudnnSetTensorNdDescriptor(gradsDesc,
@@ -385,32 +394,38 @@ void CTCWrapper::compute(Tensor loss,
   // or flat labels in GPU memory for CuDNN 8.
 
   size_t gpuWorkspaceSize;
-  CUDNN_CALL(cudnnGetCTCLossWorkspaceSize(cudnnHandle_,
-                                          logitsDesc,
-                                          gradsDesc,
-                                          flatLabels->data<int>(),
-                                          labelLengths->data<int>(),
-                                          inputLengths.data(),
-                                          CUDNN_CTC_LOSS_ALGO_DETERMINISTIC,
-                                          ctcDesc_,
-                                          &gpuWorkspaceSize));
+  CUDNN_CALL(cudnnGetCTCLossWorkspaceSize_v8(cudnnHandle_,
+                                             CUDNN_CTC_LOSS_ALGO_NON_DETERMINISTIC,
+                                             ctcDesc_,
+                                             logitsDesc,
+                                             gradsDesc,
+                                             &gpuWorkspaceSize));
 
-  void* gpuWorkspace;
-  CUDA_CALL(cudaMalloc(&gpuWorkspace, gpuWorkspaceSize));
+  //void* gpuWorkspace;
+  MemoryPiece::PtrType gpuWorkspace = graph->allocator()->alloc(gpuWorkspaceSize);
+  //CUDA_CHECK(cudaMalloc(&gpuWorkspace, gpuWorkspaceSize));
 
-  cudnnStatus_t status = cudnnCTCLoss(cudnnHandle_,
-                                      logitsDesc,
-                                      logits->data(),
-                                      flatLabels->data<int>(),
-                                      labelLengths->data<int>(),
-                                      inputLengths.data(),
-                                      loss->data(),
-                                      gradsDesc,
-                                      grads->data(),
-                                      CUDNN_CTC_LOSS_ALGO_DETERMINISTIC,
-                                      ctcDesc_,
-                                      gpuWorkspace,
-                                      gpuWorkspaceSize);
+
+  void* logitsData = logits->data();
+  int* labels = flatLabels->data<int>();
+  int* labelLens = labelLengths->data<int>();
+  int*inputLens = inputLengths.data();
+  void *costs = loss->data();
+  //void *gradsdata = grads->data();
+
+  cudnnStatus_t status = cudnnCTCLoss_v8(cudnnHandle_,
+                                         CUDNN_CTC_LOSS_ALGO_NON_DETERMINISTIC,
+                                         ctcDesc_,
+                                         logitsDesc,
+                                         logitsData,
+                                         labels,
+                                         labelLens,
+                                         inputLens,
+                                         costs,
+                                         gradsDesc,
+                                         NULL,
+                                         gpuWorkspaceSize,
+                                         gpuWorkspace->data<void>());
 
   switch(status) {
     case CUDNN_STATUS_SUCCESS:
@@ -426,7 +441,8 @@ void CTCWrapper::compute(Tensor loss,
       break;
   }
 
-  cudaFree(gpuWorkspace);
+  //cudaFree(gpuWorkspace);
+  graph->allocator()->free(gpuWorkspace);
 
   CUDNN_CALL(cudnnDestroyTensorDescriptor(logitsDesc));
   CUDNN_CALL(cudnnDestroyTensorDescriptor(gradsDesc));
