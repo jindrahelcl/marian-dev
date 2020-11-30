@@ -3,8 +3,9 @@
 #include "models/model_factory.h"
 #include "models/encoder_decoder.h"
 #include "models/encoder_classifier.h"
+#include "models/encoder_ctc_decoder.h"
 #include "models/bert.h"
-#include "models/sequence_labeler.h"
+#include "models/ctc_decoder.h"
 
 #include "models/costs.h"
 
@@ -62,10 +63,12 @@ Ptr<ClassifierBase> ClassifierFactory::construct(Ptr<ExpressionGraph> graph) {
     return New<BertMaskedLM>(graph, options_);
   else if(options_->get<std::string>("type") == "bert-classifier")
     return New<BertClassifier>(graph, options_);
-  else if(options_->get<std::string>("type") == "sequence-labeler")
-    return New<SequenceLabeler>(graph, options_);
   else
     ABORT("Unknown classifier type");
+}
+
+Ptr<CTCDecoder> CTCDecoderFactory::construct(Ptr<ExpressionGraph> graph) {
+  return New<CTCDecoder>(graph, options_);
 }
 
 Ptr<PoolerBase> PoolerFactory::construct(Ptr<ExpressionGraph> graph) {
@@ -113,6 +116,18 @@ Ptr<IModel> EncoderClassifierFactory::construct(Ptr<ExpressionGraph> graph) {
     enccls->push_back(cf(options_).construct(graph));
 
   return enccls;
+}
+
+Ptr<IModel> EncoderCTCDecoderFactory::construct(Ptr<ExpressionGraph> graph) {
+  Ptr<EncoderCTCDecoder> model;
+  model = New<EncoderCTCDecoder>(options_);
+
+  for(auto& ef : encoders_)
+    model->push_back(ef(options_).construct(graph));
+
+  model->setDecoder(decoders_[0](options_).construct(graph));
+
+  return model;
 }
 
 Ptr<IModel> EncoderPoolerFactory::construct(Ptr<ExpressionGraph> graph) {
@@ -343,11 +358,11 @@ Ptr<IModel> createBaseModelByType(std::string type, usage use, Ptr<Options> opti
   }
 
   else if(type == "transformer-nat") {
-    return models::encoder_classifier()(options)
+    return models::encoder_ctc_decoder()(options)
       ("original-type", "transformer-nat")
       ("usage", use)
       .push_back(models::encoder()("type", "transformer"))
-      .push_back(models::classifier()("type", "sequence-labeler"))
+      .push_back(models::ctc_decoder())
       .construct(graph);
   }
 
@@ -417,6 +432,10 @@ Ptr<ICriterionFunction> createCriterionFunctionFromOptions(Ptr<Options> options,
     return New<Trainer>(baseModel, New<EncoderDecoderCECost>(options));
   else if (std::dynamic_pointer_cast<EncoderClassifier>(baseModel))
     return New<Trainer>(baseModel, New<EncoderClassifierCECost>(options));
+#ifdef CUDNN
+  else if (std::dynamic_pointer_cast<EncoderCTCDecoder>(baseModel))
+    return New<Trainer>(baseModel, New<EncoderLabelerCTCCost>(options));
+#endif
 #ifdef COMPILE_EXAMPLES
   // @TODO: examples should be compiled optionally
   else if (std::dynamic_pointer_cast<MnistFeedForwardNet>(baseModel))

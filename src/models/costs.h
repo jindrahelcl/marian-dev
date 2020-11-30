@@ -7,6 +7,8 @@
 #include "models/encoder_decoder.h"
 #include "models/encoder_classifier.h"
 #include "models/encoder_pooler.h"
+#include "models/encoder_ctc_decoder.h"
+#include "models/ctc_decoder.h"
 
 namespace marian {
 namespace models {
@@ -29,20 +31,42 @@ public:
   virtual ~ICost() {}
 };
 
-/* 
-class EncoderDecoderCTCCost : public ICost {
+class EncoderLabelerCTCCost : public ICost {
 protected:
   Ptr<Options> options_;
   const bool inference_{false};
 
-  Ptr<RationalLoss> loss_;
-
 public:
-  EncoderDecoderCTCCost(Ptr<Options> options)
-      : options_(options), inference_;
+  EncoderLabelerCTCCost(Ptr<Options> options)
+      : options_(options), inference_(options->get<bool>("inference", false)) { }
 
-}
- */
+  virtual ~EncoderLabelerCTCCost() {}
+
+  Ptr<MultiRationalLoss> apply(Ptr<IModel> model,
+             Ptr<ExpressionGraph> graph,
+             Ptr<data::Batch> batch,
+             bool clearGraph = true) override {
+    auto encdec = std::static_pointer_cast<EncoderCTCDecoder>(model);
+    auto corpusBatch = std::static_pointer_cast<data::CorpusBatch>(batch);
+
+    auto result = encdec->apply(graph, corpusBatch, clearGraph);
+
+    Ptr<MultiRationalLoss> multiLoss = newMultiLoss(options_);
+
+    auto logits = result->getLogProbs();
+    auto flatLabels = graph->constant({(int)result->getTargetWords().size()}, inits::fromVector(toWordIndexVector(result->getTargetWords())));
+    auto labelLengths = graph->constant({(int)result->getTargetLengths().size()}, inits::fromVector(std::vector<float>(result->getTargetLengths().begin(), result->getTargetLengths().end())));
+
+    flatLabels->set_name("flat-labels");
+    labelLengths->set_name("label-lengths");
+
+    Expr loss = cast(ctc_loss(logits, flatLabels, labelLengths), Type::float32);
+
+    //   multiLoss->push_back(partialLoss);
+    return multiLoss;
+  }
+
+};
 
 class EncoderDecoderCECost : public ICost {
 protected:
@@ -156,7 +180,7 @@ protected:
 
 public:
   EncoderPoolerRankCost(Ptr<Options> options)
-      : options_(options), 
+      : options_(options),
         inference_(options->get<bool>("inference", false)) {
       auto trainEmbedderRank = options->get<std::vector<std::string>>("train-embedder-rank", {});
       ABORT_IF(trainEmbedderRank.empty(), "EncoderPoolerRankCost expects train-embedder-rank to be set");
@@ -200,10 +224,10 @@ public:
     auto marginLoss1 = log(dp + dn1) - exponent; // softmax-margin loss for anchor vs negative examples
     auto marginLoss2 = log(dp + dn2) - exponent; // symmetric version of the above with positive example vs negative examples
     auto marginLoss  = sum(marginLoss1 + marginLoss2, /*axis=*/-2);
-    
+
     RationalLoss loss(marginLoss, (float)dimBatch);
     multiLoss->push_back(loss);
-    
+
     return multiLoss;
   }
 };

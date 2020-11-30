@@ -14,7 +14,6 @@ namespace marian {
 class ClassifierBase :public LayerBase {
   using LayerBase::LayerBase;
 protected:
-  Ptr<Options> options_;
   const std::string prefix_{"classifier"};
   const bool inference_{false};
   const size_t batchIndex_{0};
