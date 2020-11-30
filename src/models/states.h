@@ -114,7 +114,7 @@ public:
  * @TODO: should be unified with DecoderState or not be used at all as Classifier do not really have stateful output.
  */
 class ClassifierState {
-private:
+protected:
   Expr logProbs_;
   std::vector<Ptr<EncoderState>> encStates_;
   Ptr<data::CorpusBatch> batch_;

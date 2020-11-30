@@ -325,31 +325,6 @@ public:
   }
 };
 
-class CTCLoss : public LabelwiseLoss{
-public:
-  CTCLoss() : CTCLoss(/*axes=*/{-2} /*batch axis*/) {}
-  CTCLoss(const std::vector<int>& axes) : LabelwiseLoss(axes) {}
-
-  virtual ~CTCLoss() {}
-
-protected:
-  virtual Expr compute(Logits logits, const Words& labels,
-                       Expr mask = nullptr, Expr labelWeights = nullptr) override {
-    ABORT_IF(!mask, "CTC without mask is not supported.");
-    ABORT_IF(labelWeights, "CTC with label weights is not supported");
-
-    // mask has shape time, batch. we just need batch and sum along time axis.
-    auto labelLengths = sum(mask, 0);
-
-    // TODO this will probably work when not using factors.
-    auto ctcl = logits.applyLossFunction(labels, [&](Expr logits, Expr indices) {
-      logits = atleast_3d(logits);
-      Expr ctcl = cast(ctc_loss(logits, indices, labelLengths), Type::float32);
-      return ctcl;
-    });
-  }
-};
-
 /**
  * @brief Cross entropy loss across last axis, summed up over batch and time dimensions
  */

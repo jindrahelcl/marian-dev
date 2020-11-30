@@ -9,6 +9,7 @@
 
 #ifdef CUDNN
 #include "tensors/gpu/cudnn_wrappers.h"
+#include "tensors/gpu/cuda_helpers.h"
 #endif
 
 namespace marian {
@@ -1287,12 +1288,14 @@ class CTCNodeOp : public NaryNodeOp {
 public:
   CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths)
     : NaryNodeOp({logits, flatLabels, labelLengths}, newShape(logits), logits->value_type()) {
-    matchOrAbort<IndexType>(flatLabels->value_type());
+      setMemoize(false);
+    // grads_(graph()->zeros(logits->shape())) {
+    //matchOrAbort<IndexType>(flatLabels->value_type());
 
-    int rows   = logits->shape().elements() / logits->shape()[-1];
-    int labels = labelLengths->shape().elements();
+    //int rows   = logits->shape().elements() / logits->shape()[-1];
+    //int labels = labelLengths->shape().elements();
 
-    ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
+    //ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
 
     // output shape of this op should be 1, batch, 1.
     // input lengths correspond to the time dimension of logits
@@ -1308,24 +1311,28 @@ public:
   NodeOps forwardOps() override {
     // TODO supply correct arguments, grads as output param
     // TODO figure out where to get input & label lengths
-    return {NodeOp(ctc_.compute(val_,
-                                grads_->val(),
-                                child(0)->val(),
-                                child(1)->val(),
-                                child(2)->val()))};
+
+    // segfaults because grads_ is not set.
+    // return {NodeOp(0)};
+
+    return {NodeOp(
+        ctc_.compute(val_, NULL, child(0)->val(), child(1)->val(), child(2)->val(), graph());
+        )};
   }
 
   NodeOps backwardOps() override {
     using namespace functional;
     // TODO add gradients computed in forward pass.
     // TODO Dont know whether to use adj_ or not.
-    return {NodeOp(Element(_1 = _2 + _3, child(0)->grad(), grads_->val(), adj_))};
+    return {NodeOp(0)};
+    //return {NodeOp(child(0)->grad() = adj_)}; // blbost
+    //return {NodeOp(Element(_1, child(0)->grad(), adj_))};
   }
 
   const std::string type() override { return "ctc"; }
 
 private:
-  Expr grads_;
+  // Expr grads_;
   CTCWrapper ctc_;
 };
 
