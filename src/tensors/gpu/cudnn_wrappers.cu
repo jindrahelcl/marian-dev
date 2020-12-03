@@ -522,17 +522,17 @@ CTCWrapper::CTCWrapper() {
 
 CTCWrapper::~CTCWrapper() {}
 
-CTCWrapper::setCTCLossDescriptor() {
+void CTCWrapper::setCTCLossDescriptor() {
   ABORT(
     "To use CTC, recompile with CUDNN (cmake flag "
     "-DUSE_CUDNN=on)");
 }
 
-CTCWrapper::compute(Tensor loss,
-                    Tensor grads,
-                    Tensor logits,
-                    Tensor flatLabels,
-                    Tensor labelLengths) {
+void CTCWrapper::compute(Tensor loss,
+                         Tensor grads,
+                         Tensor logits,
+                         Tensor flatLabels,
+                         Tensor labelLengths) {
   ABORT(
     "To use CTC, recompile with CUDNN (cmake flag "
     "-DUSE_CUDNN=on)");
