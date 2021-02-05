@@ -349,7 +349,7 @@ void CTCWrapper::setCTCLossDescriptor() {
 }
 
 void CTCWrapper::compute(Tensor loss,
-                         void* grads,
+                         Tensor grads,
                          Tensor logits,
                          Tensor flatLabels,
                          Tensor labelLengths,
@@ -358,9 +358,11 @@ void CTCWrapper::compute(Tensor loss,
 
   Shape logitsShape = logits->shape();
 
-  int time = logitsShape[0];
-  int batch = logitsShape[1];
-  int vocab = logitsShape[2];
+  // in the first dimension is 1.
+  ABORT_IF(logitsShape[0] != 1, "First dimension must be 1");
+  int time = logitsShape[1];
+  int batch = logitsShape[2];
+  int vocab = logitsShape[3];
 
   // TODO do this better
   std::vector<int> inputLengths;
@@ -408,7 +410,7 @@ void CTCWrapper::compute(Tensor loss,
   int* labelLens = labelLengths->data<int>();
   int*inputLens = inputLengths.data();
   void *costs = loss->data();
-  //void *gradsdata = grads->data();
+  void *gradsdata = grads->data();
 
   cudnnStatus_t status = cudnnCTCLoss_v8(cudnnHandle_,
                                          CUDNN_CTC_LOSS_ALGO_NON_DETERMINISTIC,
@@ -420,7 +422,7 @@ void CTCWrapper::compute(Tensor loss,
                                          inputLens,
                                          costs,
                                          gradsDesc,
-                                         NULL,
+                                         gradsdata,
                                          gpuWorkspaceSize,
                                          gpuWorkspace->data<void>());
 
@@ -528,11 +530,8 @@ void CTCWrapper::setCTCLossDescriptor() {
     "-DUSE_CUDNN=on)");
 }
 
-void CTCWrapper::compute(Tensor loss,
-                         Tensor grads,
-                         Tensor logits,
-                         Tensor flatLabels,
-                         Tensor labelLengths) {
+void CTCWrapper::compute(Tensor, Tensor, Tensor, Tensor, Tensor,
+                         const Ptr<ExpressionGraph>) {
   ABORT(
     "To use CTC, recompile with CUDNN (cmake flag "
     "-DUSE_CUDNN=on)");

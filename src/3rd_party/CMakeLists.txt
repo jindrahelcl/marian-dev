@@ -6,9 +6,7 @@ add_subdirectory(./SQLiteCpp)
 add_subdirectory(./pathie-cpp)
 add_subdirectory(./zlib)
 add_subdirectory(./faiss)
-add_subdirectory(./warp-ctc)
 include_directories(./faiss)
-include_directories(./warp-ctc/include)
 
 
 if(USE_FBGEMM)

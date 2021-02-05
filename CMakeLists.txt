@@ -216,6 +216,28 @@ if(USE_CCACHE)
 endif()
 
 ###############################################################################
+if(COMPILE_NONAUTOREGRESSIVE)
+  find_library(warpctc_LIBRARY NAMES warpctc PATHS /home/jhelcl/work/tools/warp-ctc/build)
+  if(warpctc_LIBRARY)
+    include_directories(/home/jhelcl/work/tools/warp-ctc/include)
+    set(EXT_LIBS ${EXT_LIBS} ${warpctc_LIBRARY})
+    message(STATUS "Found warpctc in " ${warpctc_LIBRARY})
+  else()
+    message(FATAL_ERROR "warpctc not found")
+  endif()
+
+  find_library(ctcdecode_LIBRARY NAMES ctcdecode PATHS /home/jhelcl/work/tools/ctcdecode-cpp/build)
+  if(ctcdecode_LIBRARY)
+    include_directories(/home/jhelcl/work/tools/ctcdecode-cpp/include)
+    set(EXT_LIBS ${EXT_LIBS} ${ctcdecode_LIBRARY})
+    message(STATUS "Found ctcdecode in " ${ctcdecode_LIBRARY})
+  else()
+    message(FATAL_ERROR "ctcdecode not found")
+  endif()
+
+endif(COMPILE_NONAUTOREGRESSIVE)
+
+###############################################################################
 # Downloading SentencePiece if requested and set to compile with it.
 # Requires all the dependencies imposed by SentencePiece
 if(USE_SENTENCEPIECE)

@@ -3,9 +3,7 @@
 #include "models/model_factory.h"
 #include "models/encoder_decoder.h"
 #include "models/encoder_classifier.h"
-#include "models/encoder_ctc_decoder.h"
 #include "models/bert.h"
-#include "models/ctc_decoder.h"
 
 #include "models/costs.h"
 
@@ -14,6 +12,10 @@
 #include "models/s2s.h"
 #include "models/laser.h"
 #include "models/transformer_factory.h"
+
+#include "ctc/factory.h"
+#include "ctc/model.h"
+#include "ctc/cost.h"
 
 #ifdef CUDNN
 #include "models/char_s2s.h"
@@ -67,10 +69,6 @@ Ptr<ClassifierBase> ClassifierFactory::construct(Ptr<ExpressionGraph> graph) {
     ABORT("Unknown classifier type");
 }
 
-Ptr<CTCDecoder> CTCDecoderFactory::construct(Ptr<ExpressionGraph> graph) {
-  return New<CTCDecoder>(graph, options_);
-}
-
 Ptr<PoolerBase> PoolerFactory::construct(Ptr<ExpressionGraph> graph) {
   if(options_->get<std::string>("type") == "max-pooler")
     return New<MaxPooler>(graph, options_);
@@ -116,18 +114,6 @@ Ptr<IModel> EncoderClassifierFactory::construct(Ptr<ExpressionGraph> graph) {
     enccls->push_back(cf(options_).construct(graph));
 
   return enccls;
-}
-
-Ptr<IModel> EncoderCTCDecoderFactory::construct(Ptr<ExpressionGraph> graph) {
-  Ptr<EncoderCTCDecoder> model;
-  model = New<EncoderCTCDecoder>(options_);
-
-  for(auto& ef : encoders_)
-    model->push_back(ef(options_).construct(graph));
-
-  model->setDecoder(decoders_[0](options_).construct(graph));
-
-  return model;
 }
 
 Ptr<IModel> EncoderPoolerFactory::construct(Ptr<ExpressionGraph> graph) {
@@ -418,10 +404,10 @@ Ptr<ICriterionFunction> createCriterionFunctionFromOptions(Ptr<Options> options,
     return New<Trainer>(baseModel, New<EncoderDecoderCECost>(options));
   else if (std::dynamic_pointer_cast<EncoderClassifier>(baseModel))
     return New<Trainer>(baseModel, New<EncoderClassifierCECost>(options));
-#ifdef CUDNN
+
   else if (std::dynamic_pointer_cast<EncoderCTCDecoder>(baseModel))
-    return New<Trainer>(baseModel, New<EncoderLabelerCTCCost>(options));
-#endif
+    return New<Trainer>(baseModel, New<CTCCost>(options));
+
 #ifdef COMPILE_EXAMPLES
   // @TODO: examples should be compiled optionally
   else if (std::dynamic_pointer_cast<MnistFeedForwardNet>(baseModel))
