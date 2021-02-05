@@ -7,8 +7,6 @@
 #include "models/encoder_decoder.h"
 #include "models/encoder_classifier.h"
 #include "models/encoder_pooler.h"
-#include "models/encoder_ctc_decoder.h"
-#include "models/ctc_decoder.h"
 
 namespace marian {
 namespace models {
@@ -29,43 +27,6 @@ public:
                                        Ptr<data::Batch> batch,
                                        bool clearGraph = true) = 0;
   virtual ~ICost() {}
-};
-
-class EncoderLabelerCTCCost : public ICost {
-protected:
-  Ptr<Options> options_;
-  const bool inference_{false};
-
-public:
-  EncoderLabelerCTCCost(Ptr<Options> options)
-      : options_(options), inference_(options->get<bool>("inference", false)) { }
-
-  virtual ~EncoderLabelerCTCCost() {}
-
-  Ptr<MultiRationalLoss> apply(Ptr<IModel> model,
-             Ptr<ExpressionGraph> graph,
-             Ptr<data::Batch> batch,
-             bool clearGraph = true) override {
-    auto encdec = std::static_pointer_cast<EncoderCTCDecoder>(model);
-    auto corpusBatch = std::static_pointer_cast<data::CorpusBatch>(batch);
-
-    auto result = encdec->apply(graph, corpusBatch, clearGraph);
-
-    Ptr<MultiRationalLoss> multiLoss = newMultiLoss(options_);
-
-    auto logits = result->getLogProbs();
-    auto flatLabels = graph->constant({(int)result->getTargetWords().size()}, inits::fromVector(toWordIndexVector(result->getTargetWords())));
-    auto labelLengths = graph->constant({(int)result->getTargetLengths().size()}, inits::fromVector(std::vector<float>(result->getTargetLengths().begin(), result->getTargetLengths().end())));
-
-    flatLabels->set_name("flat-labels");
-    labelLengths->set_name("label-lengths");
-
-    Expr loss = cast(ctc_loss(logits, flatLabels, labelLengths), Type::float32);
-
-    //   multiLoss->push_back(partialLoss);
-    return multiLoss;
-  }
-
 };
 
 class EncoderDecoderCECost : public ICost {

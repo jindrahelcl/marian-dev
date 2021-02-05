@@ -4,7 +4,6 @@ include_directories(.)
 include_directories(3rd_party)
 include_directories(3rd_party/SQLiteCpp/include)
 include_directories(3rd_party/sentencepiece)
-include_directories(3rd_party/warp-ctc/include)
 include_directories(3rd_party/fbgemm/include)
 include_directories(3rd_party/intgemm)
 include_directories(${CMAKE_BINARY_DIR}/src/3rd_party/intgemm) # running cmake on the intgemm submodule triggers config file generation in this directory.
@@ -103,6 +102,16 @@ set(MARIAN_SOURCES
   training/graph_group_singleton.cpp
   training/validator.cpp
   training/communicator.cpp
+
+  # non-autoregressive
+  ctc/translator.cpp
+  ctc/nat_scorer.cpp
+  ctc/beam_search.cpp
+  ctc/warpctc.cpp
+  ctc/factory.cpp
+  ctc/cost.cpp
+  ctc/decoder.cpp
+  ctc/model.cpp
 
   # this is only compiled to catch build errors, but not linked
   microsoft/quicksand.cpp

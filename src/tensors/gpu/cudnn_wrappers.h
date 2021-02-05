@@ -95,7 +95,7 @@ public:
   CTCWrapper();
 
   void compute(Tensor loss,
-               void* grads,
+               Tensor grads,
                Tensor logits,
                Tensor flatLabels,
                Tensor labelLengths,
@@ -171,7 +171,8 @@ public:
                Tensor grads,
                Tensor logits,
                Tensor flatLabels,
-               Tensor labelLengths);
+               Tensor labelLengths,
+               const Ptr<ExpressionGraph> graph);
 
   virtual ~CTCWrapper();
 
