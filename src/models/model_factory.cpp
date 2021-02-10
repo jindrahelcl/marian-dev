@@ -388,6 +388,9 @@ Ptr<IModel> createModelFromOptions(Ptr<Options> options, usage use) {
       else
         return New<Stepwise>(std::dynamic_pointer_cast<EncoderDecoder>(baseModel), New<LogSoftmaxStep>());
     }
+    else if(std::dynamic_pointer_cast<EncoderCTCDecoder>(baseModel)) {
+      return baseModel;
+    }
 #ifdef COMPILE_EXAMPLES
     // note: 'usage::translation' here means 'inference'
     else if (std::dynamic_pointer_cast<MnistFeedForwardNet>(baseModel))

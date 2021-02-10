@@ -18,9 +18,11 @@ namespace marian {
   } while(0)
 
 class WarpCTCWrapper {
+private:
+  const int blankLabelIdx_;
 
 public:
-  WarpCTCWrapper() { }
+  WarpCTCWrapper(int blankLabel) : blankLabelIdx_(blankLabel) { }
 
   void compute(Tensor loss,
                Tensor grads,

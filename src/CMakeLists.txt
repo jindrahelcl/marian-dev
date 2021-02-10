@@ -112,6 +112,7 @@ set(MARIAN_SOURCES
   ctc/cost.cpp
   ctc/decoder.cpp
   ctc/model.cpp
+  ctc/nodeops.cpp
 
   # this is only compiled to catch build errors, but not linked
   microsoft/quicksand.cpp
