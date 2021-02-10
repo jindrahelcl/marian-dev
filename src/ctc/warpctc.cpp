@@ -22,72 +22,79 @@ void WarpCTCWrapper::compute(Tensor loss,
   int batch = logitsShape[2];
   int vocab = logitsShape[3];
 
+  // TODO this should reflect mask and contain source * split_factor
   std::vector<int> input_lengths;
   for(int i = 0; i < batch; i++) {
     input_lengths.push_back(time);
   }
 
+  // Move activations and gradients to CPU memory (only for CPU warpctc)
   std::vector<float> activations;
+  std::vector<float> gradients;
+
   logits->get(activations);
+  gradients.resize(grads->size());
 
-  std::vector<float> flat_labels;
-  flatLabels->get(flat_labels);
-
-  std::vector<int> int_flat_labels;
-  for(auto item : flat_labels) {
-    int_flat_labels.push_back(static_cast<int>(item));
-  }
-
-  std::vector<float> label_lengths;
-  labelLengths->get(label_lengths);
-
-  std::vector<int> int_label_lengths;
-  for(auto item : label_lengths) {
-    int_label_lengths.push_back(static_cast<int>(item));
-  }
-
-  int alphabet_size = vocab;
-  int mini_batch = batch;
-
+  // Costs are always on CPU
   std::vector<float> costs;
   costs.resize(loss->size());
 
-  std::vector<float> gradients;
-  gradients.resize(grads->size());
+  // Move flat labels and label lengths to CPU memory (always on CPU)
+  std::vector<float> flat_labels;
+  std::vector<float> label_lengths;
+
+  flatLabels->get(flat_labels);
+  labelLengths->get(label_lengths);
+
+  std::vector<int> int_flat_labels(flat_labels.begin(), flat_labels.end());
+  std::vector<int> int_label_lengths(label_lengths.begin(), label_lengths.end());
 
   ctcOptions options;
+  options.blank_label = blankLabelIdx_;
+
+  // GPU options
+  //options.loc = CTC_GPU;
+  //options.stream = CU_STREAM_LEGACY;
+
+  // CPU options
   options.loc = CTC_CPU;
   options.num_threads = 16;
-  options.blank_label = 3; // TODO
 
   size_t workspace_size;
   WARP_CALL(get_workspace_size(
     int_label_lengths.data(), //const
     input_lengths.data(), //const
-    alphabet_size, //const
-    mini_batch,  //const
+    vocab, //const
+    batch,  //const
     options,
     &workspace_size));
 
-  //MemoryPiece::PtrType workspace = graph->allocator()->alloc(gpuWorkspaceSize);
+  //MemoryPiece::PtrType workspace = graph->allocator()->alloc(workspace_size);
 
   void *workspace = malloc(workspace_size);
 
   WARP_CALL(compute_ctc_loss(
     activations.data(), //const
+    //logits->data(),
     gradients.data(),
+    //grads->data(),
     int_flat_labels.data(), //const
     int_label_lengths.data(), //const
     input_lengths.data(), //const
-    alphabet_size, //const
-    mini_batch,
+    vocab, //const
+    batch,
     costs.data(),
     workspace,
+    //workspace->data<void>(),
     options));
 
+  //graph->allocator()->free(workspace);
   free(workspace);
 
+  // move loss back to GPU memory (always)
   loss->set(costs);
+
+  // move gradients back to GPU memory (only with CPU warpctc)
   grads->set(gradients);
 }
 

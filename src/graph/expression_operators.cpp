@@ -667,10 +667,6 @@ Expr cross_entropy(Expr logits, Expr indices) {
   return Expression<CrossEntropyNodeOp>(logits, indices);
 }
 
-Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths) {
-  return Expression<CTCNodeOp>(logits, flatLabels, labelLengths);
-}
-
 // Unlikelihood loss based on https://arxiv.org/abs/1908.04319
 Expr unlikelihood(Expr logits, Expr indices) {
   int dimBatch = logits->shape()[-2];

@@ -1,5 +1,6 @@
 #include "ctc/cost.h"
 
+#include "ctc/nodeops.h"
 #include "ctc/model.h"
 #include "ctc/decoder.h"
 

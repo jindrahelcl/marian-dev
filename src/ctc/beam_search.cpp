@@ -37,21 +37,21 @@ CTCResults CTCBeamSearch::search(Ptr<ExpressionGraph> graph, Ptr<data::CorpusBat
 
   std::vector<float> probs_flat;
   probs->val()->get(probs_flat);
+  const auto begin = std::begin(probs_flat);
 
   // probs in shape 1(beam), time, batch, vocab
   // need to convert to vectors of (batch, time, vocab)
 
   // This initializes a 3D vector
-  std::vector<std::vector<std::vector<double>>> probs_seq(
-    batch_size, std::vector<std::vector<double>>(
-      max_length, std::vector<double>(vocab_size)));
+  std::vector<std::vector<std::vector<float>>> probs_seq(
+    batch_size, std::vector<std::vector<float>>(
+      max_length, std::vector<float>(vocab_size)));
 
-  // TODO I am sure this can be done more efficiently
+  // TODO Maybe this is already efficient enough?
   for(int b = 0; b < batch_size; ++b) {
     for(int t = 0; t < max_length; ++t) {
-      for(int i = 0; i < vocab_size; ++i) {
-        probs_seq[b][t][i] = (double)probs_flat[t * b + i];
-      }
+      size_t row_begin = t * batch_size * vocab_size + b * vocab_size;
+      probs_seq[b][t].assign(begin + row_begin, begin + row_begin + vocab_size);
     }
   }
 

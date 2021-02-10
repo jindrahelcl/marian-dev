@@ -226,7 +226,7 @@ if(COMPILE_NONAUTOREGRESSIVE)
     message(FATAL_ERROR "warpctc not found")
   endif()
 
-  find_library(ctcdecode_LIBRARY NAMES ctcdecode PATHS /home/jhelcl/work/tools/ctcdecode-cpp/build)
+  find_library(ctcdecode_LIBRARY NAMES ctcdecode PATHS /home/jhelcl/work/tools/ctcdecode-cpp/build-float)
   if(ctcdecode_LIBRARY)
     include_directories(/home/jhelcl/work/tools/ctcdecode-cpp/include)
     set(EXT_LIBS ${EXT_LIBS} ${ctcdecode_LIBRARY})
