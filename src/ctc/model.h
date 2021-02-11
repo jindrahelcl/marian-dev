@@ -9,39 +9,7 @@
 
 namespace marian {
 
-class EncoderCTCDecoderBase : public models::IModel {
-public:
-  virtual ~EncoderCTCDecoderBase() {}
-
-  virtual void load(Ptr<ExpressionGraph> graph,
-                    const std::string& name,
-                    bool markedReloaded = true) override
-      = 0;
-
-  virtual void mmap(Ptr<ExpressionGraph> graph,
-                    const void* ptr,
-                    bool markedReloaded = true)
-      = 0;
-
-  virtual void save(Ptr<ExpressionGraph> graph,
-                    const std::string& name,
-                    bool saveTranslatorConfig = false) override
-      = 0;
-
-  virtual void clear(Ptr<ExpressionGraph> graph) override = 0;
-
-  virtual Logits build(Ptr<ExpressionGraph> graph,
-                       Ptr<data::Batch> batch,
-                       bool clearGraph = true) override = 0;
-
-  virtual Logits build(Ptr<ExpressionGraph> graph,
-                       Ptr<data::CorpusBatch> batch,
-                       bool clearGraph = true) = 0;
-
-  virtual Ptr<Options> getOptions() = 0;
-};
-
-class EncoderCTCDecoder : public EncoderCTCDecoderBase {
+class EncoderCTCDecoder : public models::IModel {
 protected:
   Ptr<Options> options_;
   std::string prefix_;
@@ -59,15 +27,17 @@ public:
 
   EncoderCTCDecoder(Ptr<Options> options);
 
-  virtual Logits build(Ptr<ExpressionGraph> graph,
-                       Ptr<data::CorpusBatch> batch,
-                       bool clearGraph = true) override;
+  virtual ~EncoderCTCDecoder() {}
 
-  virtual Logits build(Ptr<ExpressionGraph> graph,
-                       Ptr<data::Batch> batch,
-                       bool clearGraph = true) override;
+  Logits build(Ptr<ExpressionGraph> graph,
+               Ptr<data::CorpusBatch> batch,
+               bool clearGraph = true);
 
-  virtual Ptr<Options> getOptions() override { return options_; }
+  Logits build(Ptr<ExpressionGraph> graph,
+               Ptr<data::Batch> batch,
+               bool clearGraph = true) override;
+
+  Ptr<Options> getOptions() { return options_; }
 
   std::vector<Ptr<EncoderBase>>& getEncoders() { return encoders_; }
   Ptr<CTCDecoder>& getDecoder() { return ctcDecoder_; }
@@ -81,20 +51,19 @@ public:
     graph->load(name, markedReloaded && !opt<bool>("ignore-model-config", false));
   }
 
-  void mmap(Ptr<ExpressionGraph> graph,
-            const void* ptr,
-            bool markedReloaded = true) override {
-    graph->mmap(ptr, markedReloaded && !opt<bool>("ignore-model-config", false));
-  }
-
   void save(Ptr<ExpressionGraph> graph,
             const std::string& name,
             bool /*saveModelConfig*/) override {
     LOG(info, "Saving model weights and runtime parameters to {}", name);
     graph->save(name , getModelParametersAsString());
   }
-
   void clear(Ptr<ExpressionGraph> graph) override;
+
+  void mmap(Ptr<ExpressionGraph> graph,
+            const void* ptr,
+            bool markedReloaded = true) {
+    graph->mmap(ptr, markedReloaded && !opt<bool>("ignore-model-config", false));
+  }
 
   template <typename T>
   T opt(const std::string& key) {

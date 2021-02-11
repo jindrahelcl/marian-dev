@@ -19,24 +19,32 @@ Ptr<MultiRationalLoss> CTCCost::apply(Ptr<IModel> model,
   Ptr<MultiRationalLoss> multiLoss = newMultiLoss(options_);
 
   const auto& flatLabelsData = corpusBatch->back()->flatData();
-  const auto& labelLengthsData = corpusBatch->back()->sentenceLengths();
+  auto labelLengthsData = corpusBatch->back()->sentenceLengths();
+  auto inputLengthsData = corpusBatch->front()->sentenceLengths();
 
-
+  // TODO make these integer tensors, now there are conversions from size_t to float and then to int.
   auto flatLabels = graph->constant(
     {(int)flatLabelsData.size()},
     inits::fromVector(toWordIndexVector(flatLabelsData)));
 
   auto labelLengths = graph->constant(
     {(int)labelLengthsData.size()},
-    inits::fromVector(std::vector<float>(
-      labelLengthsData.begin(),
-      labelLengthsData.end())));
+    inits::fromVector(std::vector<float>(labelLengthsData.begin(), labelLengthsData.end())));
+
+  auto inputLengths = graph->constant(
+    {(int)labelLengthsData.size()},
+    inits::fromVector(std::vector<float>(inputLengthsData.begin(), inputLengthsData.end())));
 
   flatLabels->set_name("flat-labels");
   labelLengths->set_name("label-lengths");
 
+  // Input lengths to the CTC loss.
+  // Computed from the input mask and the split factor.
+  int split_factor = options_->get<int>("ctc-split-factor", 3);
+  Expr inputLengthsAfterSplit = inputLengths * split_factor;
+
   // calculate CTC costs per sentence and sum costs along the batch axis
-  Expr loss = cast(ctc_loss(logits.getLogits(), flatLabels, labelLengths), Type::float32);
+  Expr loss = cast(ctc_loss(logits.getLogits(), flatLabels, labelLengths, inputLengthsAfterSplit), Type::float32);
   loss = sum(loss, -2);
 
   multiLoss->push_back(RationalLoss(loss, labelLengths->shape().elements()));

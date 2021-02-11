@@ -5,7 +5,7 @@
 
 namespace marian {
 
-Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths);
+Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths, Expr inputLengths);
 
 class CTCNodeOp : public NaryNodeOp {
 private:
@@ -14,7 +14,7 @@ private:
   WarpCTCWrapper ctc_; // TODO this sets blank label ID
 
 public:
-  CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths);
+  CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths, Expr inputLengths);
 
   Shape newShape(Expr a);
 
