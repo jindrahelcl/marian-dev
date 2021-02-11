@@ -12,21 +12,16 @@ void WarpCTCWrapper::compute(Tensor loss,
                              Tensor logits,
                              Tensor flatLabels,
                              Tensor labelLengths,
+                             Tensor inputLengths,
                              const Ptr<ExpressionGraph> graph) {
 
   Shape logitsShape = logits->shape();
 
   // in the first dimension is 1.
   ABORT_IF(logitsShape[0] != 1, "First dimension must be 1");
-  int time = logitsShape[1];
+  // int time = logitsShape[1];
   int batch = logitsShape[2];
   int vocab = logitsShape[3];
-
-  // TODO this should reflect mask and contain source * split_factor
-  std::vector<int> input_lengths;
-  for(int i = 0; i < batch; i++) {
-    input_lengths.push_back(time);
-  }
 
   // Move activations and gradients to CPU memory (only for CPU warpctc)
   std::vector<float> activations;
@@ -42,12 +37,15 @@ void WarpCTCWrapper::compute(Tensor loss,
   // Move flat labels and label lengths to CPU memory (always on CPU)
   std::vector<float> flat_labels;
   std::vector<float> label_lengths;
+  std::vector<float> input_lengths;
 
   flatLabels->get(flat_labels);
   labelLengths->get(label_lengths);
+  inputLengths->get(input_lengths);
 
   std::vector<int> int_flat_labels(flat_labels.begin(), flat_labels.end());
   std::vector<int> int_label_lengths(label_lengths.begin(), label_lengths.end());
+  std::vector<int> int_input_lengths(input_lengths.begin(), input_lengths.end());
 
   ctcOptions options;
   options.blank_label = blankLabelIdx_;
@@ -63,7 +61,7 @@ void WarpCTCWrapper::compute(Tensor loss,
   size_t workspace_size;
   WARP_CALL(get_workspace_size(
     int_label_lengths.data(), //const
-    input_lengths.data(), //const
+    int_input_lengths.data(), //const
     vocab, //const
     batch,  //const
     options,
@@ -80,7 +78,7 @@ void WarpCTCWrapper::compute(Tensor loss,
     //grads->data(),
     int_flat_labels.data(), //const
     int_label_lengths.data(), //const
-    input_lengths.data(), //const
+    int_input_lengths.data(), //const
     vocab, //const
     batch,
     costs.data(),

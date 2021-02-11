@@ -29,6 +29,7 @@ public:
                Tensor logits,
                Tensor flatLabels,
                Tensor labelLengths,
+               Tensor inputLengths,
                const Ptr<ExpressionGraph> graph);
 };
 } // namespace marian

@@ -243,7 +243,7 @@ void ConfigParser::addOptionsModel(cli::CLIWrapper& cli) {
       "Tie all embedding layers and output layer");
   cli.add<bool>("--output-omit-bias",
       "Do not use a bias vector in decoder output layer");
-  
+
   // Transformer options
   cli.add<int>("--transformer-heads",
       "Number of heads in multi-head attention (transformer)",
@@ -302,6 +302,9 @@ void ConfigParser::addOptionsModel(cli::CLIWrapper& cli) {
   cli.add<float>("--bert-masking-fraction", "Fraction of masked out tokens during training", 0.15f);
   cli.add<bool>("--bert-train-type-embeddings", "Train bert type embeddings, set to false to use static sinusoidal embeddings", true);
   cli.add<int>("--bert-type-vocab-size", "Size of BERT type vocab (sentence A and B)", 2);
+
+  cli.add<int>("--ctc-split-factor", "CTC splitting factor", 3);
+
 #ifdef CUDNN
   cli.add<int>("--char-stride",
       "Width of max-pooling layer after convolution layer in char-s2s model",

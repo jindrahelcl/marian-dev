@@ -2,8 +2,8 @@
 
 namespace marian {
 
-Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths) {
-  return Expression<CTCNodeOp>(logits, flatLabels, labelLengths);
+Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths, Expr inputLengths) {
+  return Expression<CTCNodeOp>(logits, flatLabels, labelLengths, inputLengths);
 }
 
 Shape CTCNodeOp::newShape(Expr a) {
@@ -13,8 +13,8 @@ Shape CTCNodeOp::newShape(Expr a) {
   return shape1;
 }
 
-CTCNodeOp::CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths)
-  : NaryNodeOp({logits, flatLabels, labelLengths}, newShape(logits), logits->value_type()),
+CTCNodeOp::CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths, Expr inputLengths)
+  : NaryNodeOp({logits, flatLabels, labelLengths, inputLengths}, newShape(logits), logits->value_type()),
     grads_(graph()->zeros(logits->shape())),
     ctc_(3) {
 
@@ -32,12 +32,6 @@ CTCNodeOp::CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths)
 }
 
 NodeOps CTCNodeOp::forwardOps() {
-  // TODO supply correct arguments, grads as output param
-  // TODO figure out where to get input & label lengths
-
-  // segfaults because grads_ is not set.
-  // return {NodeOp(0)};
-
   return {NodeOp(
       ctc_.compute(
         /* loss= */         val_,
@@ -45,18 +39,15 @@ NodeOps CTCNodeOp::forwardOps() {
         /* logits= */       child(0)->val(),
         /* flatLabels= */   child(1)->val(),
         /* labelLengths= */ child(2)->val(),
+        /* inputLengths= */ child(3)->val(),
         /* graph= */        graph());
       )};
 }
 
 NodeOps CTCNodeOp::backwardOps() {
   using namespace functional;
-  // TODO add gradients computed in forward pass.
   // TODO Dont know whether to use adj_ or not.
   return {NodeOp(
-    // pseudo-code: child(0)->grad() = grads_->val()
-    // assign value of grads_ to child(0)->grad().
-
     // child(0)->grad is initialized with zeros, so it should
     // suffice to just add the grads->val() to it.
 
