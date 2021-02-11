@@ -67,7 +67,6 @@ public:
                        Ptr<data::Batch> batch,
                        bool clearGraph = true) override;
 
-
   virtual Ptr<Options> getOptions() override { return options_; }
 
   std::vector<Ptr<EncoderBase>>& getEncoders() { return encoders_; }
