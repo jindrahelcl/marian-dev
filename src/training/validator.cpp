@@ -1,4 +1,5 @@
 #include "training/validator.h"
+#include "ctc/validator.h"
 
 namespace marian {
 
@@ -26,8 +27,14 @@ std::vector<Ptr<ValidatorBase/*<data::Corpus>*/>> Validators(
       auto validator = New<TranslationValidator>(vocabs, config);
       validators.push_back(validator);
     } else if(metric == "bleu" || metric == "bleu-detok" || metric == "bleu-segmented" || metric == "chrf") {
-      auto validator = New<SacreBleuValidator>(vocabs, config, metric);
-      validators.push_back(validator);
+      if (config->get<std::string>("type") == "transformer-nat") {
+	auto validator = New<NATSacreBleuValidator>(vocabs, config, metric);
+	validators.push_back(validator);
+      }
+      else {
+	auto validator = New<SacreBleuValidator>(vocabs, config, metric);
+	validators.push_back(validator);
+      }
     } else if(metric == "accuracy") {
       auto validator = New<AccuracyValidator>(vocabs, config);
       validators.push_back(validator);

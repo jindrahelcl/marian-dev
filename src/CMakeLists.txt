@@ -113,6 +113,7 @@ set(MARIAN_SOURCES
   ctc/decoder.cpp
   ctc/model.cpp
   ctc/nodeops.cpp
+  ctc/validator.cpp
 
   # this is only compiled to catch build errors, but not linked
   microsoft/quicksand.cpp

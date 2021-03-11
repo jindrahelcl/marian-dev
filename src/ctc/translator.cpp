@@ -42,10 +42,10 @@ NARTranslate::NARTranslate(Ptr<Options> options) : options_(New<Options>(options
 
       graph->setDefaultElementType(typeFromString(prec[0]));
       graph->setDevice(device);
-      graph->getBackend()->setClip(options_->get<float>("clip-gemm"));
-      if (device.type == DeviceType::cpu) {
-	graph->getBackend()->setOptimized(options_->get<bool>("optimize"));
-      }
+      //graph->getBackend()->setClip(options_->get<float>("clip-gemm"));
+      //if (device.type == DeviceType::cpu) {
+      //  graph->getBackend()->setOptimized(options_->get<bool>("optimize"));
+      //}
       graph->reserveWorkspaceMB(options_->get<size_t>("workspace"));
       graphs_[id] = graph;
 
