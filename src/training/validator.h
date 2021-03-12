@@ -232,12 +232,6 @@ public:
   std::string type() override { return metric_; }
 
 protected:
-  bool computeChrF_{ false }; // should we compute ChrF instead of BLEU (BLEU by default)?
-  size_t order_{ 4 };                      // 4-grams for BLEU by default
-  static const size_t statsPerOrder = 3;   // 0: common ngrams, 1: candidate ngrams, 2: reference ngrams
-  bool quiet_{ false };
-
-
   // Tokenizer function adapted from multi-bleu-detok.pl, corresponds to sacreBLEU.py
   static std::string tokenize(const std::string& text) {
     std::string normText = text;
@@ -355,9 +349,14 @@ protected:
     return 0;
   }
 
-private:
+protected:
   const std::string metric_;  // allowed values are: bleu, bleu-detok (same as bleu), bleu-segmented, chrf
+  bool computeChrF_{ false }; // should we compute ChrF instead of BLEU (BLEU by default)?
+
+  size_t order_{ 4 };                      // 4-grams for BLEU by default
+  static const size_t statsPerOrder = 3;   // 0: common ngrams, 1: candidate ngrams, 2: reference ngrams
   bool useWordIds_{ false };               // compute BLEU score by matching numeric segment ids
+  bool quiet_{ false };
 };
 
 /**
