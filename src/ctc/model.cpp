@@ -84,8 +84,7 @@ void EncoderCTCDecoder::clear(Ptr<ExpressionGraph> graph) {
   for(auto& enc : encoders_)
     enc->clear();
 
-  // TODO ??
-  //ctcDecoder_.clear();
+  ctcDecoder_->clear();
 }
 
 Logits EncoderCTCDecoder::build(Ptr<ExpressionGraph> graph,
@@ -98,7 +97,12 @@ Logits EncoderCTCDecoder::build(Ptr<ExpressionGraph> graph,
   for(auto& encoder : encoders_)
       encoderStates.push_back(encoder->build(graph, batch));
 
-  return Logits(ctcDecoder_->apply(graph, batch, encoderStates));
+  if(shortlistGenerator_) {
+    auto shortlist = shortlistGenerator_->generate(batch);
+    ctcDecoder_->setShortlist(shortlist);
+  }
+
+  return ctcDecoder_->apply(graph, batch, encoderStates);
 }
 
 Logits EncoderCTCDecoder::build(Ptr<ExpressionGraph> graph,

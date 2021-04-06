@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "marian.h"
+#include "data/shortlist.h"
 #include "ctc/model.h"
 
 
@@ -33,6 +34,9 @@ public:
   Logits score(Ptr<ExpressionGraph> graph, Ptr<data::CorpusBatch> batch);
 
   void init(Ptr<ExpressionGraph> graph);
+
+  void setShortlistGenerator(Ptr<const data::ShortlistGenerator> shortlistGenerator);
+  Ptr<data::Shortlist> getShortlist();
 
 };
 

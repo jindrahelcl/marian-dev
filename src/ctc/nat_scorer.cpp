@@ -66,5 +66,12 @@ Ptr<NATScorer> createNATScorer(Ptr<Options> options) {
   return natScorerByType(fname, weight, model, modelOptions);
 }
 
+void NATScorer::setShortlistGenerator(Ptr<const data::ShortlistGenerator> shortlistGenerator) {
+  model_->setShortlistGenerator(shortlistGenerator);
+}
+
+Ptr<data::Shortlist> NATScorer::getShortlist() {
+  return model_->getShortlist();
+}
 
 }

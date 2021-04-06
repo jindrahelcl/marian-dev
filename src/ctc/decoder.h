@@ -1,6 +1,7 @@
 #pragma once
 
 #include "marian.h"
+#include "data/shortlist.h"
 #include "models/transformer.h"
 
 namespace marian {
@@ -16,6 +17,7 @@ protected:
   using Base::graph_;
 
   const int splitFactor_{3};
+  Ptr<data::Shortlist> shortlist_;
 
 public:
   CTCDecoder(Ptr<ExpressionGraph> graph, Ptr<Options> options)
@@ -24,9 +26,17 @@ public:
              options->get<bool>("embedding-fix-trg", false)),
         splitFactor_(options->get<size_t>("ctc-split-factor", 3)) {}
 
-  Expr apply(Ptr<ExpressionGraph> graph,
-             Ptr<data::CorpusBatch> batch,
-             const std::vector<Ptr<EncoderState>>& encoderStates);
+  Logits apply(Ptr<ExpressionGraph> graph,
+	       Ptr<data::CorpusBatch> batch,
+	       const std::vector<Ptr<EncoderState>>& encoderStates);
+
+  void clear();
+
+  Ptr<data::Shortlist> getShortlist() { return shortlist_; }
+
+  void setShortlist(Ptr<data::Shortlist> shortlist) {
+    shortlist_ = shortlist;
+  }
 
   virtual ~CTCDecoder() {}
 
@@ -34,6 +44,11 @@ protected:
   Expr expandMask(Expr mask);
 
   Expr splitStates(Expr input);
+
+private:
+  Ptr<mlp::Output> output_;
+
+  void lazyCreateOutputLayer();
 };
 
 } // namespace marian

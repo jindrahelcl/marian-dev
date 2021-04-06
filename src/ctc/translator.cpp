@@ -3,6 +3,7 @@
 #include "ctc/output_printer.h"
 
 #include "data/corpus.h"
+#include "data/shortlist.h"
 #include "data/text_input.h"
 #include "translator/output_collector.h"
 
@@ -24,7 +25,9 @@ NARTranslate::NARTranslate(Ptr<Options> options) : options_(New<Options>(options
   trgVocab_->load(vocabs.back());
   auto srcVocab = corpus_->getVocabs()[0];
 
-  // TODO shortlist initialization here
+  if(options_->hasAndNotEmpty("shortlist"))
+    shortlistGenerator_ = New<data::LexicalShortlistGenerator>(
+      options_, srcVocab, trgVocab_, 0, 1, vocabs.front() == vocabs.back());
 
   auto devices = Config::getDevices(options_);
   numDevices_ = devices.size();
@@ -52,7 +55,8 @@ NARTranslate::NARTranslate(Ptr<Options> options) : options_(New<Options>(options
       auto scorer = createNATScorer(options_);
       scorer->init(graph);
 
-      // TODO init shortlist generator for scorer
+      if(shortlistGenerator_)
+	scorer->setShortlistGenerator(shortlistGenerator_);
 
       scorers_[id] = scorer;
       graph->forward();

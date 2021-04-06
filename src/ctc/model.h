@@ -2,6 +2,7 @@
 
 #include "marian.h"
 
+#include "data/shortlist.h"
 #include "models/encoder.h"
 #include "models/model_base.h"
 #include "models/states.h"
@@ -11,6 +12,7 @@ namespace marian {
 
 class EncoderCTCDecoder : public models::IModel {
 protected:
+  Ptr<const data::ShortlistGenerator> shortlistGenerator_;
   Ptr<Options> options_;
   std::string prefix_;
   std::vector<Ptr<EncoderBase>> encoders_;
@@ -79,6 +81,16 @@ public:
   void set(std::string key, T value) {
     options_->set(key, value);
   }
+
+  void setShortlistGenerator(
+      Ptr<const data::ShortlistGenerator> shortlistGenerator) {
+    shortlistGenerator_ = shortlistGenerator;
+  };
+
+  Ptr<data::Shortlist> getShortlist() {
+    return ctcDecoder_->getShortlist();
+  };
+
 
 };
 

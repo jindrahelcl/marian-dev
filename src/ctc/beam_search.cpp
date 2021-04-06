@@ -24,6 +24,7 @@ CTCResults CTCBeamSearch::search(Ptr<ExpressionGraph> graph, Ptr<data::CorpusBat
   scorer_->clear(graph);
 
   auto logits = scorer_->score(graph, batch);
+  auto shortlist = scorer_->getShortlist();
 
   // get probabilities
   Expr probs = softmax(logits.getLogits());
@@ -87,7 +88,10 @@ CTCResults CTCBeamSearch::search(Ptr<ExpressionGraph> graph, Ptr<data::CorpusBat
     Words decoded;
 
     for(int token : tokens) {
-      decoded.push_back(Word::fromWordIndex(token));
+      if(shortlist)
+	decoded.push_back(Word::fromWordIndex(shortlist->reverseMap(token)));
+      else
+	decoded.push_back(Word::fromWordIndex(token));
     }
 
     results[i] = New<CTCSearchResult>(sentId, decoded, score);

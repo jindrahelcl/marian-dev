@@ -19,10 +19,9 @@ private:
 
   Ptr<data::Corpus> corpus_;
   Ptr<Vocab> trgVocab_;
-  // Ptr<const data::ShortlistGenerator> shortlistGenerator_;
+  Ptr<const data::ShortlistGenerator> shortlistGenerator_;
 
   size_t numDevices_;
-
 
 public:
   NARTranslate(Ptr<Options> options);
@@ -30,6 +29,5 @@ public:
   void run() override;
 
 };
-
 
 }
