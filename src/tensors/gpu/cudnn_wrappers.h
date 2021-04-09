@@ -4,7 +4,6 @@
 
 #include "common/shape.h"
 #include "tensors/tensor.h"
-#include "graph/expression_graph.h"
 
 #ifdef CUDNN
 
@@ -89,26 +88,6 @@ protected:
   cudnnPoolingDescriptor_t poolingDesc_;
   cudnnPoolingMode_t poolingMode_;
 };
-
-class CTCWrapper : public CUDNNWrapper {
-public:
-  CTCWrapper();
-
-  void compute(Tensor loss,
-               Tensor grads,
-               Tensor logits,
-               Tensor flatLabels,
-               Tensor labelLengths,
-               const Ptr<ExpressionGraph> graph);
-
-  virtual ~CTCWrapper();
-
-protected:
-  void setCTCLossDescriptor();
-
-  cudnnCTCLossDescriptor_t ctcDesc_;
-};
-
 }  // namespace marian
 
 #else
@@ -162,24 +141,6 @@ public:
 
   virtual ~PoolingWrapper();
 };
-
-class CTCWrapper : public CUDNNWrapper {
-public:
-  CTCWrapper();
-
-  void compute(Tensor loss,
-               Tensor grads,
-               Tensor logits,
-               Tensor flatLabels,
-               Tensor labelLengths,
-               const Ptr<ExpressionGraph> graph);
-
-  virtual ~CTCWrapper();
-
-protected:
-  void setCTCLossDescriptor();
-};
-
 }  // namespace marian
 
 #endif

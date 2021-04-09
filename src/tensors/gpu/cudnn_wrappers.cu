@@ -1,22 +1,10 @@
 #include "tensors/gpu/cudnn_wrappers.h"
-#include "tensors/gpu/cuda_helpers.h"
 
 namespace marian {
 
 #ifdef CUDNN
 
 #include <cudnn.h>
-
-#define CUDA_CALL(x)                  \
-  do {                                \
-    if((x) != cudaSuccess) {          \
-      printf("Error (%s) at %s:%d\n", \
-             cudaGetErrorString(x),   \
-             __FILE__,                \
-             __LINE__);               \
-    }                                 \
-  } while(0)
-
 
 #define CUDNN_CALL(x)                 \
   do {                                \
@@ -331,128 +319,15 @@ PoolingWrapper::~PoolingWrapper() {
   CUDNN_CALL(cudnnDestroyPoolingDescriptor(poolingDesc_));
 }
 
-/******************************************************************************
- CTCWrapper
-*****************************************************************************/
+#else
 
-CTCWrapper::CTCWrapper() {
-  setCTCLossDescriptor();
+CUDNNWrapper::CUDNNWrapper() {
+  ABORT(
+      "To use convolution and pooling, recompile with CUDNN (cmake flag "
+      "-DUSE_CUDNN=on)");
 }
 
-void CTCWrapper::setCTCLossDescriptor() {
-  CUDNN_CALL(cudnnCreateCTCLossDescriptor(&ctcDesc_));
-  CUDNN_CALL(cudnnSetCTCLossDescriptor_v8(ctcDesc_,
-                                          CUDNN_DATA_FLOAT,
-                                          CUDNN_LOSS_NORMALIZATION_SOFTMAX,
-                                          CUDNN_NOT_PROPAGATE_NAN,
-                                          256));
-}
-
-void CTCWrapper::compute(Tensor loss,
-                         Tensor grads,
-                         Tensor logits,
-                         Tensor flatLabels,
-                         Tensor labelLengths,
-                         const Ptr<ExpressionGraph> graph) {
-  CUDA_CHECK(cudaSetDevice(loss->getDeviceId().no));
-
-  Shape logitsShape = logits->shape();
-
-  // in the first dimension is 1.
-  ABORT_IF(logitsShape[0] != 1, "First dimension must be 1");
-  int time = logitsShape[1];
-  int batch = logitsShape[2];
-  int vocab = logitsShape[3];
-
-  // TODO do this better
-  std::vector<int> inputLengths;
-  for(int i = 0; i < batch; i++) {
-    inputLengths.push_back(time);
-  }
-
-  const int dims[] = {time, batch, vocab};
-  const int strides[] = {batch * vocab, vocab, 1};
-
-  cudnnTensorDescriptor_t logitsDesc;
-  CUDNN_CALL(cudnnCreateTensorDescriptor(&logitsDesc));
-  CUDNN_CALL(cudnnSetTensorNdDescriptor(logitsDesc,
-                                        CUDNN_DATA_FLOAT,
-                                        3,
-                                        dims,
-                                        strides));
-
-  cudnnTensorDescriptor_t gradsDesc;
-  CUDNN_CALL(cudnnCreateTensorDescriptor(&gradsDesc));
-  CUDNN_CALL(cudnnSetTensorNdDescriptor(gradsDesc,
-                                        CUDNN_DATA_FLOAT,
-                                        3,
-                                        dims,
-                                        strides));
-
-  // TODO here, supply flat labels in CPU memory for CuDNN 7,
-  // or flat labels in GPU memory for CuDNN 8.
-
-  size_t gpuWorkspaceSize;
-  CUDNN_CALL(cudnnGetCTCLossWorkspaceSize_v8(cudnnHandle_,
-                                             CUDNN_CTC_LOSS_ALGO_NON_DETERMINISTIC,
-                                             ctcDesc_,
-                                             logitsDesc,
-                                             gradsDesc,
-                                             &gpuWorkspaceSize));
-
-  //void* gpuWorkspace;
-  MemoryPiece::PtrType gpuWorkspace = graph->allocator()->alloc(gpuWorkspaceSize);
-  //CUDA_CHECK(cudaMalloc(&gpuWorkspace, gpuWorkspaceSize));
-
-
-  void* logitsData = logits->data();
-  int* labels = flatLabels->data<int>();
-  int* labelLens = labelLengths->data<int>();
-  int*inputLens = inputLengths.data();
-  void *costs = loss->data();
-  void *gradsdata = grads->data();
-
-  cudnnStatus_t status = cudnnCTCLoss_v8(cudnnHandle_,
-                                         CUDNN_CTC_LOSS_ALGO_NON_DETERMINISTIC,
-                                         ctcDesc_,
-                                         logitsDesc,
-                                         logitsData,
-                                         labels,
-                                         labelLens,
-                                         inputLens,
-                                         costs,
-                                         gradsDesc,
-                                         gradsdata,
-                                         gpuWorkspaceSize,
-                                         gpuWorkspace->data<void>());
-
-  switch(status) {
-    case CUDNN_STATUS_SUCCESS:
-      break;
-    case CUDNN_STATUS_BAD_PARAM:
-      if (time > 256) {  // TODO not time, but label lengths!
-          printf("Too many labels (%d). Limit is 256.", time);
-      }
-      break;
-    case CUDNN_STATUS_NOT_SUPPORTED:
-    case CUDNN_STATUS_EXECUTION_FAILED:
-      printf("Error in CTC loss computation: %s", cudnnGetErrorString(status));
-      break;
-  }
-
-  //cudaFree(gpuWorkspace);
-  graph->allocator()->free(gpuWorkspace);
-
-  CUDNN_CALL(cudnnDestroyTensorDescriptor(logitsDesc));
-  CUDNN_CALL(cudnnDestroyTensorDescriptor(gradsDesc));
-}
-
-CTCWrapper::~CTCWrapper() {
-  CUDNN_CALL(cudnnDestroyCTCLossDescriptor(ctcDesc_));
-}
-
-#else  // CUDNN
-
+CUDNNWrapper::~CUDNNWrapper() {}
 
 ConvolutionWrapper::ConvolutionWrapper(const Shape&,
                                        const Shape&,
@@ -516,34 +391,5 @@ void PoolingWrapper::backward(Tensor, Tensor, Tensor, Tensor) {
 
 PoolingWrapper::~PoolingWrapper() {}
 
-CTCWrapper::CTCWrapper() {
-  ABORT(
-    "To use CTC, recompile with CUDNN (cmake flag "
-    "-DUSE_CUDNN=on)");
-}
-
-CTCWrapper::~CTCWrapper() {}
-
-void CTCWrapper::setCTCLossDescriptor() {
-  ABORT(
-    "To use CTC, recompile with CUDNN (cmake flag "
-    "-DUSE_CUDNN=on)");
-}
-
-void CTCWrapper::compute(Tensor, Tensor, Tensor, Tensor, Tensor,
-                         const Ptr<ExpressionGraph>) {
-  ABORT(
-    "To use CTC, recompile with CUDNN (cmake flag "
-    "-DUSE_CUDNN=on)");
-}
-
-CUDNNWrapper::CUDNNWrapper() {
-  ABORT(
-      "To use convolution and pooling, recompile with CUDNN (cmake flag "
-      "-DUSE_CUDNN=on)");
-}
-
-CUDNNWrapper::~CUDNNWrapper() {}
-
-#endif  // CUDNN
+#endif
 }  // namespace marian
