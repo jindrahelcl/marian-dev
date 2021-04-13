@@ -5,53 +5,36 @@
 #include "common/shape.h"
 #include "tensors/tensor.h"
 #include "graph/expression_graph.h"
-#include "tensors/gpu/cudnn_wrappers.h"
+#include "ctc/ctc_wrapper.h"
 
 #ifdef CUDNN
 #include <cudnn.h>
+#endif
 
 namespace marian {
 
-class CTCWrapper : public CUDNNWrapper {
+class CUDNNCTCWrapper : public CTCWrapper {
+
 public:
-  CTCWrapper();
+  CUDNNCTCWrapper(int blankTokenIndex);
 
-  void compute(Tensor loss,
-               Tensor grads,
-               Tensor logits,
-               Tensor flatLabels,
-               Tensor labelLengths,
-               const Ptr<ExpressionGraph> graph);
+  virtual void compute(Tensor loss,
+		       Tensor grads,
+		       Tensor logits,
+		       Tensor flatLabels,
+		       Tensor labelLengths,
+		       Tensor inputLenghts,
+		       const Ptr<ExpressionGraph> graph) override;
 
-  virtual ~CTCWrapper();
+  virtual ~CUDNNCTCWrapper();
 
 protected:
   void setCTCLossDescriptor();
 
+#ifdef CUDNN
   cudnnCTCLossDescriptor_t ctcDesc_;
-};
-
-}  // namespace marian
-
-#else
-
-class CTCWrapper : public CUDNNWrapper {
-public:
-  CTCWrapper();
-
-  void compute(Tensor loss,
-               Tensor grads,
-               Tensor logits,
-               Tensor flatLabels,
-               Tensor labelLengths,
-               const Ptr<ExpressionGraph> graph);
-
-  virtual ~CTCWrapper();
-
-protected:
-  void setCTCLossDescriptor();
-};
-
-}  // namespace marian
-
+  cudnnHandle_t cudnnHandle_;
 #endif
+};
+
+}  // namespace marian

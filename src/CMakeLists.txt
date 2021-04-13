@@ -186,6 +186,7 @@ if(CUDA_FOUND)
     tensors/gpu/cudnn_wrappers.cu
     translator/nth_element.cu
     translator/helpers.cu
+    ctc/cudnn_ctc.cu
     STATIC)
 
   target_compile_options(marian_cuda PRIVATE ${ALL_WARNINGS})

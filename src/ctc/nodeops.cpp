@@ -1,9 +1,33 @@
+#include "graph/expression_operators.h"
 #include "ctc/nodeops.h"
+
 
 namespace marian {
 
 Expr ctc_loss(Expr logits, Expr flatLabels, Expr labelLengths, Expr inputLengths) {
+
+  #ifdef CUDNN
+  // TODO VERY UGLY HACK
+
+  // cudnn implementation needs blank token on index 0. swapping here, cost
+  // does not care, and grads get backpropagated and swapped back, hopefully.
+  int vocab_size = logits->shape()[-1];
+  std::vector<IndexType> range(vocab_size);
+  std::iota(range.begin(), range.end(), 0);
+
+  // this is fixed for blank token on index 3
+  range[0] = 3;
+  range[3] = 0;
+
+  // this assumes 0 (EOS) is not in flat labels. if it is, things will get
+  // messy. Let's try.
+
+  return Expression<CTCNodeOp>(index_select(logits, -1, range), flatLabels, labelLengths, inputLengths);
+  #else
+
   return Expression<CTCNodeOp>(logits, flatLabels, labelLengths, inputLengths);
+  #endif
+
 }
 
 Shape CTCNodeOp::newShape(Expr a) {
@@ -19,16 +43,6 @@ CTCNodeOp::CTCNodeOp(Expr logits, Expr flatLabels, Expr labelLengths, Expr input
     ctc_(3) {
 
     setMemoize(false);
-  //  {
-  //matchOrAbort<IndexType>(flatLabels->value_type());
-
-  //int rows   = logits->shape().elements() / logits->shape()[-1];
-  //int labels = labelLengths->shape().elements();
-
-  //ABORT_IF(rows != labels, "Number of examples and labels does not match: {} != {}", rows, labels);
-
-  // output shape of this op should be 1, batch, 1.
-  // input lengths correspond to the time dimension of logits
 }
 
 NodeOps CTCNodeOp::forwardOps() {

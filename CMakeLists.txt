@@ -374,7 +374,7 @@ if(CUDA_FOUND)
   endif(USE_STATIC_LIBS)
 
   if(USE_CUDNN)
-    find_package(CUDNN "7.0")
+    find_package(CUDNN "8.0")
     if(CUDNN_FOUND)
       include_directories(${CUDNN_INCLUDE_DIRS})
       set(EXT_LIBS ${EXT_LIBS} ${CUDNN_LIBRARIES})

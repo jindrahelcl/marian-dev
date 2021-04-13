@@ -2,6 +2,7 @@
 
 #include "tensors/tensor.h"
 #include "graph/expression_graph.h"
+#include "ctc/ctc_wrapper.h"
 
 #include <ctc.h>
 
@@ -17,19 +18,15 @@ namespace marian {
     }                                 \
   } while(0)
 
-class WarpCTCWrapper {
-private:
-  const int blankLabelIdx_;
+class WarpCTCWrapper : public CTCWrapper {
 
 public:
-  WarpCTCWrapper(int blankLabel) : blankLabelIdx_(blankLabel) { }
-
-  void compute(Tensor loss,
-               Tensor grads,
-               Tensor logits,
-               Tensor flatLabels,
-               Tensor labelLengths,
-               Tensor inputLengths,
-               const Ptr<ExpressionGraph> graph);
+  virtual void compute(Tensor loss,
+		       Tensor grads,
+		       Tensor logits,
+		       Tensor flatLabels,
+		       Tensor labelLengths,
+		       Tensor inputLengths,
+		       const Ptr<ExpressionGraph> graph) override;
 };
 } // namespace marian

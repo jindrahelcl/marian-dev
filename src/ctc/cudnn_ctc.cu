@@ -1,5 +1,10 @@
-#include "tensors/gpu/cudnn_wrappers.h"
 #include "tensors/gpu/cuda_helpers.h"
+#include "ctc/cudnn_ctc.h"
+
+namespace marian {
+
+#ifdef CUDNN
+#include <cudnn.h>
 
 #define CUDA_CALL(x)                  \
   do {                                \
@@ -22,11 +27,12 @@
     }                                 \
   } while(0)
 
-CTCWrapper::CTCWrapper() {
+CUDNNCTCWrapper::CUDNNCTCWrapper(int blankTokenIndex) : CTCWrapper(blankTokenIndex) {
+  CUDNN_CALL(cudnnCreate(&cudnnHandle_));
   setCTCLossDescriptor();
 }
 
-void CTCWrapper::setCTCLossDescriptor() {
+void CUDNNCTCWrapper::setCTCLossDescriptor() {
   CUDNN_CALL(cudnnCreateCTCLossDescriptor(&ctcDesc_));
   CUDNN_CALL(cudnnSetCTCLossDescriptor_v8(ctcDesc_,
                                           CUDNN_DATA_FLOAT,
@@ -35,12 +41,13 @@ void CTCWrapper::setCTCLossDescriptor() {
                                           256));
 }
 
-void CTCWrapper::compute(Tensor loss,
-                         Tensor grads,
-                         Tensor logits,
-                         Tensor flatLabels,
-                         Tensor labelLengths,
-                         const Ptr<ExpressionGraph> graph) {
+void CUDNNCTCWrapper::compute(Tensor loss,
+			      Tensor grads,
+			      Tensor logits,
+			      Tensor flatLabels,
+			      Tensor labelLengths,
+			      Tensor inputLengths,
+			      const Ptr<ExpressionGraph> graph) {
   CUDA_CHECK(cudaSetDevice(loss->getDeviceId().no));
 
   Shape logitsShape = logits->shape();
@@ -51,11 +58,20 @@ void CTCWrapper::compute(Tensor loss,
   int batch = logitsShape[2];
   int vocab = logitsShape[3];
 
-  // TODO do this better
-  std::vector<int> inputLengths;
-  for(int i = 0; i < batch; i++) {
-    inputLengths.push_back(time);
-  }
+  // BLANK TOKEN NEEDS TO BE ON INDEX ZERO FOR CUDNN
+  // need to swap values in the according columns, then move back
+  float* logitsData = logits->data();
+
+  // for every i in TIME, for every j in BATCH,
+
+  // switch logitsData[:, :, :, blankTokenIndex_] with logitsData[:, :, :, 0].
+
+  // axis = -1
+  Tensor blankLogits;
+  Tensor indices;
+  Select(blankLogits, logits, indices, -1);
+
+
 
   const int dims[] = {time, batch, vocab};
   const int strides[] = {batch * vocab, vocab, 1};
@@ -91,11 +107,9 @@ void CTCWrapper::compute(Tensor loss,
   MemoryPiece::PtrType gpuWorkspace = graph->allocator()->alloc(gpuWorkspaceSize);
   //CUDA_CHECK(cudaMalloc(&gpuWorkspace, gpuWorkspaceSize));
 
-
-  void* logitsData = logits->data();
   int* labels = flatLabels->data<int>();
   int* labelLens = labelLengths->data<int>();
-  int*inputLens = inputLengths.data();
+  int *inputLens = inputLengths->data<int>();
   void *costs = loss->data();
   void *gradsdata = grads->data();
 
@@ -134,29 +148,34 @@ void CTCWrapper::compute(Tensor loss,
   CUDNN_CALL(cudnnDestroyTensorDescriptor(gradsDesc));
 }
 
-CTCWrapper::~CTCWrapper() {
+CUDNNCTCWrapper::~CUDNNCTCWrapper() {
   CUDNN_CALL(cudnnDestroyCTCLossDescriptor(ctcDesc_));
+  CUDNN_CALL(cudnnDestroy(cudnnHandle_));
 }
 
 #else  // CUDNN
 
-CTCWrapper::CTCWrapper() {
+CUDNNCTCWrapper::CUDNNCTCWrapper(int blankTokenIndex) {
   ABORT(
-    "To use CTC, recompile with CUDNN (cmake flag "
+    "To use CUDNN CTC, recompile with CUDNN (cmake flag "
     "-DUSE_CUDNN=on)");
 }
 
-CTCWrapper::~CTCWrapper() {}
+CUDNNCTCWrapper::~CUDNNCTCWrapper() {}
 
-void CTCWrapper::setCTCLossDescriptor() {
+void CUDNNCTCWrapper::setCTCLossDescriptor() {
   ABORT(
-    "To use CTC, recompile with CUDNN (cmake flag "
+    "To use CUDNN CTC, recompile with CUDNN (cmake flag "
     "-DUSE_CUDNN=on)");
 }
 
-void CTCWrapper::compute(Tensor, Tensor, Tensor, Tensor, Tensor,
-                         const Ptr<ExpressionGraph>) {
+void CUDNNCTCWrapper::compute(Tensor, Tensor, Tensor, Tensor, Tensor, Tensor,
+			      const Ptr<ExpressionGraph>) {
   ABORT(
-    "To use CTC, recompile with CUDNN (cmake flag "
+    "To use CUDNN CTC, recompile with CUDNN (cmake flag "
     "-DUSE_CUDNN=on)");
 }
+
+#endif
+
+} // namespace marian
