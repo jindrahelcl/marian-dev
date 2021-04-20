@@ -155,7 +155,7 @@ CUDNNCTCWrapper::~CUDNNCTCWrapper() {
 
 #else  // CUDNN
 
-CUDNNCTCWrapper::CUDNNCTCWrapper(int blankTokenIndex) {
+CUDNNCTCWrapper::CUDNNCTCWrapper(int blankTokenIndex) : CTCWrapper(blankTokenIndex) {
   ABORT(
     "To use CUDNN CTC, recompile with CUDNN (cmake flag "
     "-DUSE_CUDNN=on)");

@@ -21,6 +21,8 @@ namespace marian {
 class WarpCTCWrapper : public CTCWrapper {
 
 public:
+  WarpCTCWrapper(int blankLabelIndex) : CTCWrapper(blankLabelIndex) { }
+
   virtual void compute(Tensor loss,
 		       Tensor grads,
 		       Tensor logits,
@@ -28,5 +30,7 @@ public:
 		       Tensor labelLengths,
 		       Tensor inputLengths,
 		       const Ptr<ExpressionGraph> graph) override;
+
+  virtual ~WarpCTCWrapper() { }
 };
 } // namespace marian

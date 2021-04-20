@@ -22,6 +22,8 @@ public:
 		       Tensor labelLengths,
 		       Tensor inputLengths,
 		       const Ptr<ExpressionGraph> graph) = 0;
+
+  virtual ~CTCWrapper() { }
 };
 
 } // namespace marian

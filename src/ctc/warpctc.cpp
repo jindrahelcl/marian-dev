@@ -5,6 +5,8 @@
 
 #include <ctc.h>
 
+#define WARPCTC_GPU 1
+
 namespace marian {
 
 void WarpCTCWrapper::compute(Tensor loss,
@@ -24,10 +26,12 @@ void WarpCTCWrapper::compute(Tensor loss,
   int vocab = logitsShape[3];
 
   // Move activations and gradients to CPU memory (only for CPU warpctc)
+#ifndef WARPCTC_GPU
   std::vector<float> activations;
-  std::vector<float> gradients;
-
   logits->get(activations);
+#endif
+
+  std::vector<float> gradients;
   gradients.resize(grads->size());
 
   // Costs are always on CPU
@@ -50,13 +54,16 @@ void WarpCTCWrapper::compute(Tensor loss,
   ctcOptions options;
   options.blank_label = blankLabelIdx_;
 
+#ifdef WARPCTC_GPU
   // GPU options
-  //options.loc = CTC_GPU;
-  //options.stream = CU_STREAM_LEGACY;
+  options.loc = CTC_GPU;
+  options.stream = CU_STREAM_LEGACY;
 
+#else
   // CPU options
   options.loc = CTC_CPU;
   options.num_threads = 16;
+#endif
 
   size_t workspace_size;
   WARP_CALL(get_workspace_size(
@@ -67,15 +74,28 @@ void WarpCTCWrapper::compute(Tensor loss,
     options,
     &workspace_size));
 
-  //MemoryPiece::PtrType workspace = graph->allocator()->alloc(workspace_size);
+#ifdef WARPCTC_GPU
+  MemoryPiece::PtrType workspace = graph->allocator()->alloc(workspace_size);
 
+  WARP_CALL(compute_ctc_loss(
+    logits->data(),
+    grads->data(),
+    int_flat_labels.data(), //const
+    int_label_lengths.data(), //const
+    int_input_lengths.data(), //const
+    vocab, //const
+    batch,
+    costs.data(),
+    workspace->data<void>(),
+    options));
+
+  graph->allocator()->free(workspace);
+#else
   void *workspace = malloc(workspace_size);
 
   WARP_CALL(compute_ctc_loss(
     activations.data(), //const
-    //logits->data(),
     gradients.data(),
-    //grads->data(),
     int_flat_labels.data(), //const
     int_label_lengths.data(), //const
     int_input_lengths.data(), //const
@@ -83,17 +103,16 @@ void WarpCTCWrapper::compute(Tensor loss,
     batch,
     costs.data(),
     workspace,
-    //workspace->data<void>(),
     options));
 
-  //graph->allocator()->free(workspace);
   free(workspace);
-
-  // move loss back to GPU memory (always)
-  loss->set(costs);
 
   // move gradients back to GPU memory (only with CPU warpctc)
   grads->set(gradients);
+#endif
+
+    // move loss back to GPU memory (always)
+  loss->set(costs);
 }
 
 } //namespace marian
